@@ -135,7 +135,6 @@ graph(ImgName, {DbName, FileName, Args}) ->
 init([]) ->
     chash_pg:create(errdb),
 	ets:new(errdb_rrdfile, [set, named_table]),
-	?INFO("Errdb client is started...[ok]", []),
     {ok, state}.
 
 %%--------------------------------------------------------------------

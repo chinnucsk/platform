@@ -1,7 +1,7 @@
 #!/bin/bash
-ROOTDIR=/opt/wifioss/errdb
+ROOTDIR=/opt/platform/errdb
 
-RRDTOOL_POOL=9
+RRDTOOL_POOL=0
 
 for ((  i = 0 ; i <= $RRDTOOL_POOL; i++  ))
 do
@@ -13,7 +13,7 @@ do
   fi
   SOCK=unix:$ROOTDIR/var/sock/rrdcached${i}.sock
   mkdir -p $JOURNAL
-  rrdcached -w 1200 -z 600 -t 8 -l $SOCK -p $PID -j $JOURNAL
+  rrdcached -w 1200 -z 600 -t 8 -l $SOCK -p $PID 
   echo "start rrdcached ${i}...done"
 done
 
@@ -21,6 +21,6 @@ LOG_LEVEL=4
 
 LOG_PATH=$ROOTDIR/var/log/errdb.log
 
-erl -noinput -detached -smp auto +K true -name errdb@opengoss.com -pa ./ebin -config etc/errdb/errdb -boot start_sasl -s reloader -s errdb_app -log_level $LOG_LEVEL -log_path $LOG_PATH -rrdtool_pool $RRDTOOL_POOL -rrdcached_sock unix:$ROOTDIR/var/sock
+erl -noinput -detached -smp auto +K true -sname errdb -pa ./ebin -config etc/errdb/errdb -boot start_sasl -s reloader -s errdb_app -log_level $LOG_LEVEL -log_path $LOG_PATH -rrdtool_pool $RRDTOOL_POOL -rrdcached_sock unix:$ROOTDIR/var/sock
 
 # 
