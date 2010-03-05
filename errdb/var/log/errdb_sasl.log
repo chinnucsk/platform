@@ -1,0 +1,332 @@
+
+=PROGRESS REPORT==== 15-Jan-2010::12:35:37 ===
+          supervisor: {local,sasl_safe_sup}
+             started: [{pid,<0.41.0>},
+                       {name,alarm_handler},
+                       {mfa,{alarm_handler,start_link,[]}},
+                       {restart_type,permanent},
+                       {shutdown,2000},
+                       {child_type,worker}]
+
+=PROGRESS REPORT==== 15-Jan-2010::12:35:37 ===
+          supervisor: {local,sasl_safe_sup}
+             started: [{pid,<0.42.0>},
+                       {name,overload},
+                       {mfa,{overload,start_link,[]}},
+                       {restart_type,permanent},
+                       {shutdown,2000},
+                       {child_type,worker}]
+
+=PROGRESS REPORT==== 15-Jan-2010::12:35:37 ===
+          supervisor: {local,sasl_sup}
+             started: [{pid,<0.40.0>},
+                       {name,sasl_safe_sup},
+                       {mfa,
+                           {supervisor,start_link,
+                               [{local,sasl_safe_sup},sasl,safe]}},
+                       {restart_type,permanent},
+                       {shutdown,infinity},
+                       {child_type,supervisor}]
+
+=PROGRESS REPORT==== 15-Jan-2010::12:35:37 ===
+          supervisor: {local,sasl_sup}
+             started: [{pid,<0.43.0>},
+                       {name,release_handler},
+                       {mfa,{release_handler,start_link,[]}},
+                       {restart_type,permanent},
+                       {shutdown,2000},
+                       {child_type,worker}]
+
+=PROGRESS REPORT==== 15-Jan-2010::12:35:37 ===
+         application: sasl
+          started_at: 'errdb@opengoss.com'
+
+=PROGRESS REPORT==== 15-Jan-2010::12:35:37 ===
+          supervisor: {local,crypto_sup}
+             started: [{pid,<0.52.0>},
+                       {name,crypto_server},
+                       {mfa,{crypto_server,start_link,[]}},
+                       {restart_type,permanent},
+                       {shutdown,2000},
+                       {child_type,worker}]
+
+=PROGRESS REPORT==== 15-Jan-2010::12:35:37 ===
+         application: crypto
+          started_at: 'errdb@opengoss.com'
+
+=PROGRESS REPORT==== 15-Jan-2010::12:35:37 ===
+          supervisor: {local,core_sup}
+             started: [{pid,<0.58.0>},
+                       {name,chash_pg},
+                       {mfa,{chash_pg,start_link,[]}},
+                       {restart_type,permanent},
+                       {shutdown,1000},
+                       {child_type,worker}]
+
+=PROGRESS REPORT==== 15-Jan-2010::12:35:37 ===
+          supervisor: {local,core_sup}
+             started: [{pid,<0.59.0>},
+                       {name,cron},
+                       {mfa,{cron,start_link,[]}},
+                       {restart_type,permanent},
+                       {shutdown,1000},
+                       {child_type,worker}]
+
+=PROGRESS REPORT==== 15-Jan-2010::12:35:37 ===
+         application: core
+          started_at: 'errdb@opengoss.com'
+
+=PROGRESS REPORT==== 15-Jan-2010::12:35:37 ===
+          supervisor: {local,errdb_sup}
+             started: [{pid,<0.64.0>},
+                       {name,errdb_monitor},
+                       {mfa,{errdb_monitor,start_link,[]}},
+                       {restart_type,permanent},
+                       {shutdown,10},
+                       {child_type,worker}]
+
+=PROGRESS REPORT==== 15-Jan-2010::12:35:37 ===
+          supervisor: {local,errdb_sup}
+             started: [{pid,<0.65.0>},
+                       {name,errdb_template},
+                       {mfa,
+                           {errdb_template,start_link,
+                               ["etc/errdb/templates"]}},
+                       {restart_type,permanent},
+                       {shutdown,10},
+                       {child_type,worker}]
+
+=PROGRESS REPORT==== 15-Jan-2010::12:35:37 ===
+          supervisor: {local,errdb_sup}
+             started: [{pid,<0.70.0>},
+                       {name,errdb_0},
+                       {mfa,
+                           {errdb,start_link,
+                               [errdb_0,
+                                [{id,0},
+                                 {data_dir,"/opt/wifioss/rrdb"},
+                                 {rrdtool_cmd,"rrdtool -"},
+                                 {rrdcached_sock,
+                                     "unix:/opt/wifioss/errdb/var/sock"}]]}},
+                       {restart_type,permanent},
+                       {shutdown,10},
+                       {child_type,worker}]
+
+=PROGRESS REPORT==== 15-Jan-2010::12:35:37 ===
+          supervisor: {local,errdb_sup}
+             started: [{pid,<0.72.0>},
+                       {name,errdb_1},
+                       {mfa,
+                           {errdb,start_link,
+                               [errdb_1,
+                                [{id,1},
+                                 {data_dir,"/opt/wifioss/rrdb"},
+                                 {rrdtool_cmd,"rrdtool -"},
+                                 {rrdcached_sock,
+                                     "unix:/opt/wifioss/errdb/var/sock"}]]}},
+                       {restart_type,permanent},
+                       {shutdown,10},
+                       {child_type,worker}]
+
+=PROGRESS REPORT==== 15-Jan-2010::12:35:38 ===
+          supervisor: {local,errdb_sup}
+             started: [{pid,<0.74.0>},
+                       {name,errdb_2},
+                       {mfa,
+                           {errdb,start_link,
+                               [errdb_2,
+                                [{id,2},
+                                 {data_dir,"/opt/wifioss/rrdb"},
+                                 {rrdtool_cmd,"rrdtool -"},
+                                 {rrdcached_sock,
+                                     "unix:/opt/wifioss/errdb/var/sock"}]]}},
+                       {restart_type,permanent},
+                       {shutdown,10},
+                       {child_type,worker}]
+
+=PROGRESS REPORT==== 15-Jan-2010::12:35:38 ===
+          supervisor: {local,errdb_sup}
+             started: [{pid,<0.76.0>},
+                       {name,errdb_3},
+                       {mfa,
+                           {errdb,start_link,
+                               [errdb_3,
+                                [{id,3},
+                                 {data_dir,"/opt/wifioss/rrdb"},
+                                 {rrdtool_cmd,"rrdtool -"},
+                                 {rrdcached_sock,
+                                     "unix:/opt/wifioss/errdb/var/sock"}]]}},
+                       {restart_type,permanent},
+                       {shutdown,10},
+                       {child_type,worker}]
+
+=PROGRESS REPORT==== 15-Jan-2010::12:35:38 ===
+          supervisor: {local,errdb_sup}
+             started: [{pid,<0.78.0>},
+                       {name,errdb_4},
+                       {mfa,
+                           {errdb,start_link,
+                               [errdb_4,
+                                [{id,4},
+                                 {data_dir,"/opt/wifioss/rrdb"},
+                                 {rrdtool_cmd,"rrdtool -"},
+                                 {rrdcached_sock,
+                                     "unix:/opt/wifioss/errdb/var/sock"}]]}},
+                       {restart_type,permanent},
+                       {shutdown,10},
+                       {child_type,worker}]
+
+=PROGRESS REPORT==== 15-Jan-2010::12:35:38 ===
+          supervisor: {local,errdb_sup}
+             started: [{pid,<0.80.0>},
+                       {name,errdb_5},
+                       {mfa,
+                           {errdb,start_link,
+                               [errdb_5,
+                                [{id,5},
+                                 {data_dir,"/opt/wifioss/rrdb"},
+                                 {rrdtool_cmd,"rrdtool -"},
+                                 {rrdcached_sock,
+                                     "unix:/opt/wifioss/errdb/var/sock"}]]}},
+                       {restart_type,permanent},
+                       {shutdown,10},
+                       {child_type,worker}]
+
+=PROGRESS REPORT==== 15-Jan-2010::12:35:38 ===
+          supervisor: {local,errdb_sup}
+             started: [{pid,<0.82.0>},
+                       {name,errdb_6},
+                       {mfa,
+                           {errdb,start_link,
+                               [errdb_6,
+                                [{id,6},
+                                 {data_dir,"/opt/wifioss/rrdb"},
+                                 {rrdtool_cmd,"rrdtool -"},
+                                 {rrdcached_sock,
+                                     "unix:/opt/wifioss/errdb/var/sock"}]]}},
+                       {restart_type,permanent},
+                       {shutdown,10},
+                       {child_type,worker}]
+
+=PROGRESS REPORT==== 15-Jan-2010::12:35:38 ===
+          supervisor: {local,errdb_sup}
+             started: [{pid,<0.84.0>},
+                       {name,errdb_7},
+                       {mfa,
+                           {errdb,start_link,
+                               [errdb_7,
+                                [{id,7},
+                                 {data_dir,"/opt/wifioss/rrdb"},
+                                 {rrdtool_cmd,"rrdtool -"},
+                                 {rrdcached_sock,
+                                     "unix:/opt/wifioss/errdb/var/sock"}]]}},
+                       {restart_type,permanent},
+                       {shutdown,10},
+                       {child_type,worker}]
+
+=PROGRESS REPORT==== 15-Jan-2010::12:35:38 ===
+          supervisor: {local,errdb_sup}
+             started: [{pid,<0.86.0>},
+                       {name,errdb_8},
+                       {mfa,
+                           {errdb,start_link,
+                               [errdb_8,
+                                [{id,8},
+                                 {data_dir,"/opt/wifioss/rrdb"},
+                                 {rrdtool_cmd,"rrdtool -"},
+                                 {rrdcached_sock,
+                                     "unix:/opt/wifioss/errdb/var/sock"}]]}},
+                       {restart_type,permanent},
+                       {shutdown,10},
+                       {child_type,worker}]
+
+=PROGRESS REPORT==== 15-Jan-2010::12:35:38 ===
+          supervisor: {local,errdb_sup}
+             started: [{pid,<0.88.0>},
+                       {name,errdb_9},
+                       {mfa,
+                           {errdb,start_link,
+                               [errdb_9,
+                                [{id,9},
+                                 {data_dir,"/opt/wifioss/rrdb"},
+                                 {rrdtool_cmd,"rrdtool -"},
+                                 {rrdcached_sock,
+                                     "unix:/opt/wifioss/errdb/var/sock"}]]}},
+                       {restart_type,permanent},
+                       {shutdown,10},
+                       {child_type,worker}]
+
+=PROGRESS REPORT==== 15-Jan-2010::12:35:38 ===
+          supervisor: {local,errdb_sup}
+             started: [{pid,<0.90.0>},
+                       {name,errdb_httpd},
+                       {mfa,
+                           {errdb_httpd,start,
+                               [[{ip,"0.0.0.0"},
+                                 {port,8000},
+                                 {port,8000},
+                                 {docroot,"/opt/cloud/errdb/priv/www"}]]}},
+                       {restart_type,permanent},
+                       {shutdown,10},
+                       {child_type,worker}]
+
+=PROGRESS REPORT==== 15-Jan-2010::12:35:38 ===
+         application: errdb
+          started_at: 'errdb@opengoss.com'
+
+=CRASH REPORT==== 15-Jan-2010::12:35:49 ===
+  crasher:
+    initial call: chash_pg:init/1
+    pid: <0.58.0>
+    registered_name: chash_pg
+    exception exit: {function_clause,
+                        [{chash_pg,delete_vnode,
+                             [vnodes,errdb,
+                              {8408670730855287925060049529299593761137160728,
+                               <0.88.0>,15}]},
+                         {chash_pg,'-handle_info/2-fun-0-',3},
+                         {lists,foreach,2},
+                         {chash_pg,handle_info,2},
+                         {gen_server,handle_msg,5},
+                         {proc_lib,init_p_do_apply,3}]}
+      in function  gen_server:terminate/6
+    ancestors: [core_sup,<0.56.0>]
+    messages: [{'EXIT',<0.86.0>,shutdown}]
+    links: [<0.57.0>]
+    dictionary: []
+    trap_exit: true
+    status: running
+    heap_size: 28657
+    stack_size: 24
+    reductions: 12393047
+  neighbours:
+
+=SUPERVISOR REPORT==== 15-Jan-2010::12:35:49 ===
+     Supervisor: {local,core_sup}
+     Context:    child_terminated
+     Reason:     {function_clause,
+                     [{chash_pg,delete_vnode,
+                          [vnodes,errdb,
+                           {8408670730855287925060049529299593761137160728,
+                            <0.88.0>,15}]},
+                      {chash_pg,'-handle_info/2-fun-0-',3},
+                      {lists,foreach,2},
+                      {chash_pg,handle_info,2},
+                      {gen_server,handle_msg,5},
+                      {proc_lib,init_p_do_apply,3}]}
+     Offender:   [{pid,<0.58.0>},
+                  {name,chash_pg},
+                  {mfa,{chash_pg,start_link,[]}},
+                  {restart_type,permanent},
+                  {shutdown,1000},
+                  {child_type,worker}]
+
+
+=PROGRESS REPORT==== 15-Jan-2010::12:35:49 ===
+          supervisor: {local,core_sup}
+             started: [{pid,<0.96.0>},
+                       {name,chash_pg},
+                       {mfa,{chash_pg,start_link,[]}},
+                       {restart_type,permanent},
+                       {shutdown,1000},
+                       {child_type,worker}]

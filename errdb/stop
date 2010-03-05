@@ -1,0 +1,15 @@
+#!/bin/bash
+RRDTOOL_POOL=9
+
+for ((  i = 0 ; i <= $RRDTOOL_POOL; i++  ))
+do
+  PID_FILE=var/pids/rrdcached${i}.pid
+  if [ -f $PID_FILE ]
+  then
+    kill -9 `cat $PID_FILE`
+    rm $PID_FILE
+  fi
+  rm -rf var/sock/*
+done
+
+erl -noinput -name errdbctl -pa ./ebin -s errdb_ctl -extra errdb stop
