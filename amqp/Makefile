@@ -4,6 +4,7 @@ all: deps
 deps:
 	cp ../elog/ebin/* ebin
 	cp ../elog/include/* include 
+	cp ../core/ebin/* ebin
 
 clean:
 	(cd src;$(MAKE) clean)

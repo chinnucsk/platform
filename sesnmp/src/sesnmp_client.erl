@@ -40,6 +40,7 @@
 -define(VERSION, v2c).
 
 -define(COMMUNITY, "public").
+-define(WRITE_COMMUNITY, "private").
 
 %%%-------------------------------------------------------------------
 %%% API
@@ -144,7 +145,7 @@ handle_cast(Msg, State) ->
     {noreply, State}.
     
 handle_info({sync_timeout, ReqId, From}, State) ->
-    ?WARNING("received sync_timeout [~w] message", [ReqId]),
+    %?WARNING("received sync_timeout [~w] message", [ReqId]),
     case lookup_req(ReqId) of
 	[#request{addr = Addr, mon = MonRef, from = From} = _Req0] ->
 	    gen_server:reply(From, {error, {timeout, {ReqId, Addr}}}),
@@ -249,7 +250,7 @@ handle_sync_get_bulk(Pid, Addr, Port, NonRep, MaxRep, Oids, AgentData, Timeout, 
     ok.
 
 handle_sync_set(Pid, Addr, Port, VarsAndVals, AgentData, Timeout, From, State) ->
-    MsgData = msg_data(AgentData),
+    MsgData = msg_data(write, AgentData),
     ReqId  = send_set_request(Addr, Port, VarsAndVals, MsgData, State),
     Msg    = {sync_timeout, ReqId, From},
     Ref    = erlang:send_after(Timeout, self(), Msg),
@@ -290,7 +291,7 @@ handle_snmp_pdu(#pdu{type = 'get-response', request_id = ReqId} = Pdu,
 	[#request{ref = Ref, mon = MonRef, from = From}] -> 
 	    Remaining = 
 		case (catch cancel_timer(Ref)) of
-		    Rem when integer(Rem) ->
+		    Rem when is_integer(Rem) ->
 			Rem;
 		    _ ->
 			0
@@ -382,7 +383,7 @@ make_pdu_impl(set, Varbinds) ->
 	 varbinds     = Varbinds}.
 	       
 check_is_pure_oid([]) -> [];
-check_is_pure_oid([X | T]) when integer(X), X >=0 ->
+check_is_pure_oid([X | T]) when is_integer(X), X >=0 ->
     [X | check_is_pure_oid(T)];
 check_is_pure_oid([X | _T]) ->
     throw({error, {invalid_oid, X}}).
@@ -421,8 +422,16 @@ make_vb(Oid) ->
     #varbind{oid = Oid, variabletype = 'NULL', value = 'NULL'}.
 
 msg_data(AgentData) ->
+    msg_data(read, AgentData).
+
+msg_data(read, AgentData) ->
     Vsn = get_opt(vsn, AgentData, ?VERSION),
     Comm = get_opt(community, AgentData, ?COMMUNITY),
+    {version(Vsn), Comm};
+
+msg_data(write, AgentData) ->
+    Vsn = get_opt(vsn, AgentData, ?VERSION),
+    Comm = get_opt(writeCommunity, AgentData, ?WRITE_COMMUNITY),
     {version(Vsn), Comm}.
 
 version(v1) ->

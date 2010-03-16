@@ -24,6 +24,7 @@ stop() ->
 init([Opts]) ->
     case (catch do_init(Opts)) of
 	{ok, State} ->
+        io:format("~n~s: sesnmp trapd is starting...[done]~n", [node()]),
 	    {ok, State};
 	{error, Reason} ->
 	    {stop, Reason}

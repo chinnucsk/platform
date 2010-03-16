@@ -3,7 +3,7 @@
 -export([get_group/2, get_group/3, get_group/4, get_group/5,
          get_table/2, get_table/3, get_table/4,
          get_entry/3, get_entry/4, get_entry/5,
-         set_group/3, set_group/4
+         set/3, set/4
      ]).
 
 -include_lib("snmp/include/snmp_types.hrl").
@@ -33,18 +33,19 @@ get_group(Addr, Port, Scalars, AgentData, Timeout) ->
 		{error, Error}
 	end.
 
-set_group(Addr, Scalars, AgentData) ->
-    set_group(Addr, ?PORT, Scalars, AgentData).
+%%VarVals = [{name, oid, type, val}]
+set(Addr, VarVals, AgentData) ->
+    set(Addr, ?PORT, VarVals, AgentData).
 
-set_group(Addr, Port, Scalars, AgentData) ->
-    {Names, VarsAndVals} = split_vars(Scalars),
+set(Addr, Port, VarVals, AgentData) ->
+    {Names, VarsAndVals} = split_var_vals(VarVals),
     case retry(fun() -> sesnmp_client:set(Addr, Port, VarsAndVals, AgentData, ?TIMEOUT) end, ?RETRIES) of
     {ok, {noError, 0, Varbinds}, _} ->
 		{ok, merge_vars(Names, Varbinds)}; %TODO
 	Error ->
 		{error, Error}
 	end.
-
+    
 get_table(Addr, Columns) ->
     get_table(Addr, Columns, []).
 
@@ -118,10 +119,17 @@ split_vars(Vars) ->
 	split_vars(Vars, [], []).
 
 split_vars([{Name, Oid}|T], Names, Oids) ->
-	split_vars(T, [Name|Names], [Oid|Oids]);
-
+	split_vars(T, [Name|Names], [formatoid(Oid)|Oids]);
 split_vars([], Names, Oids) ->
 	{lists:reverse(Names), lists:reverse(Oids)}.
+
+split_var_vals(VarList) ->
+    split_var_vals(VarList, [], []).
+
+split_var_vals([{Name, Oid, Type, Val}|T], Names, VarsAndVals) ->
+    split_var_vals(T, [Name|Names], [{formatoid(Oid), Type, Val}|VarsAndVals]);
+split_var_vals([], Names, VarsAndVals) ->
+    {lists:reverse(Names), lists:reverse(VarsAndVals)}.
 	
 merge_vars(Names, Varbinds) ->
 	merge_vars(Names, Varbinds, []).
@@ -150,3 +158,12 @@ start_with_oid(Oid1, Oid2) ->
 	true ->
 		false
 	end.
+
+formatoid(Oid) ->
+    DotIdx = string:chr(Oid, $.),
+    if
+    DotIdx > 0 ->
+        [list_to_integer(O) || O <- string:tokens(Oid, ".")];
+    true ->
+        Oid
+    end.

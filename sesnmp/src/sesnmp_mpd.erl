@@ -163,7 +163,8 @@ generate_v1_v2c_outgoing_msg(Message) ->
     end.
 
 get_max_message_size() ->
-    1024.
+    %%Notice: 
+    20480.
 
 %%-----------------------------------------------------------------
 %% Version(s) functions
