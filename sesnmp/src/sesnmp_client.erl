@@ -40,6 +40,7 @@
 -define(VERSION, v2c).
 
 -define(COMMUNITY, "public").
+
 -define(WRITE_COMMUNITY, "private").
 
 %%%-------------------------------------------------------------------

@@ -57,7 +57,7 @@ get_table(Addr, Columns, AgentData, TIMEOUT) ->
 
 get_table(Addr, Port, Columns, AgentData, TIMEOUT) ->
 	[{_, Col1Oid} | _] = Columns,
-	case get_table(Addr, Port, Col1Oid, Columns, AgentData, TIMEOUT, []) of
+	case get_table(Addr, Port, formatoid(Col1Oid), Columns, AgentData, TIMEOUT, []) of
 	{ok, Rows} ->
 		{ok, lists:reverse(Rows)};
 	{error, Error} ->
