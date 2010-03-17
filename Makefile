@@ -11,8 +11,8 @@ all:
 	(cd mochiweb;$(MAKE))
 	mkdir -p errdb/ebin errdb/doc
 	(cd errdb;$(MAKE))
-	#mkdir -p exmpp/ebin exmpp/doc
-	#(cd exmpp;$(MAKE))
+	mkdir -p exmpp/ebin exmpp/doc
+	(cd exmpp;$(MAKE))
 	mkdir -p iconv/ebin iconv/doc
 	(cd iconv;$(MAKE))
 	mkdir -p mysql/ebin mysql/doc
@@ -26,7 +26,7 @@ clean:
 	(cd core;$(MAKE) clean)
 	(cd elog;$(MAKE) clean)
 	(cd errdb;$(MAKE) clean)
-	#(cd exmpp;$(MAKE) clean)
+	(cd exmpp;$(MAKE) clean)
 	(cd iconv;$(MAKE) clean)
 	(cd mochiweb;$(MAKE) clean)
 	(cd mysql;$(MAKE) clean)
