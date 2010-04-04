@@ -9,7 +9,7 @@
 %%%----------------------------------------------------------------------
 -module(extbif).
 
--export([timestamp/0, to_list/1, to_binary/1]).
+-export([timestamp/0, to_list/1, to_binary/1, binary_to_atom/1]).
 
 %%unit: second
 timestamp() ->
@@ -30,5 +30,8 @@ to_binary(B) when is_binary(B) ->
 
 to_binary(L) when is_list(L) ->
     list_to_binary(L).
+
+binary_to_atom(B) ->
+    list_to_atom(binary_to_list(B)).
 
 
