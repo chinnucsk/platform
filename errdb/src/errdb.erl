@@ -482,8 +482,10 @@ handle_template_action(Action, RRDFile, Args, #state{id = Id, rrdpid = Pid, rrdc
 							Cmd = parse_cmd(Template, [{rrdfile, RRDFile}, {rrdcached, " --daemon " ++ CAddr} | Args], []),
 							?INFO("~p, ~p", [Id, Cmd]),
 							case apply(erlrrd, Action, [Pid, Cmd]) of
-								{ok, Resp} -> {ok, Resp};
-								{error, Error} -> {error, {500, Error}}
+								{ok, Resp} -> 
+                                    {ok, Resp};
+								{error, Error} -> 
+                                    {error, {500, Error}}
 							end;
 						false ->
 							{error, {500, "Cannot find create template: " ++ TemplateId}}
