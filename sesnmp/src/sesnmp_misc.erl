@@ -41,9 +41,9 @@
 	]).
 
 
-verify_behaviour(Behaviour, UserMod) when atom(Behaviour), atom(UserMod) ->
+verify_behaviour(Behaviour, UserMod) when is_atom(Behaviour), is_atom(UserMod) ->
     case (catch UserMod:module_info(exports)) of
-        Exps when list(Exps) ->
+        Exps when is_list(Exps) ->
             Callbacks = Behaviour:behaviour_info(callbacks),
             (catch verify_behaviour2(Callbacks, Exps));
         _ ->
@@ -276,10 +276,10 @@ mem_size(X) ->
     M2 - M1.
 
 
-strip_extension_from_filename(FileName, Ext) when atom(FileName) ->
+strip_extension_from_filename(FileName, Ext) when is_atom(FileName) ->
     strip_extension_from_filename(atom_to_list(FileName), Ext);
 
-strip_extension_from_filename(FileName, Ext) when list(FileName) ->
+strip_extension_from_filename(FileName, Ext) when is_list(FileName) ->
     case lists:suffix(Ext, FileName) of
 	true -> lists:sublist(FileName, 1, length(FileName) - length(Ext));
 	false -> FileName
@@ -295,7 +295,7 @@ bits_to_int(Val,Kibbles) ->
 
 bits_to_int([],_Kibbles,Res) -> Res;
 bits_to_int([Kibble|Ks],Kibbles,Res) ->
-    case snmp_misc:assq(Kibble,Kibbles) of
+    case assq(Kibble,Kibbles) of
 	{value,V} ->
 	    bits_to_int(Ks,Kibbles,Res + round(math:pow(2,V)));
 	_ ->
@@ -317,7 +317,7 @@ ensure_trailing_dir_delimiter(DirSuggestion) ->
     end.
 
 
-format_pdu(PDU, MiniMib) when record(PDU, pdu) ->
+format_pdu(PDU, MiniMib) when is_record(PDU, pdu) ->
     #pdu{type=T, error_status=ES, error_index=EI,
 	 request_id=RID,varbinds=VBs}=PDU,
     Txt1 = if
@@ -369,7 +369,7 @@ format_vb(#varbind{oid = Oid, variabletype = Type, value = Value}, MiniMib) ->
     [io_lib:format("  ~w = ", [Soid]),
      format_val(Type, Mtype, Value, MiniMib) | "\n"].
 
-format(Max, F, A) when integer(Max) ->
+format(Max, F, A) when is_integer(Max) ->
     case lists:flatten(io_lib:format(F,A)) of
 	S when length(S) > Max ->
 	    case lists:suffix("\n", S) of
@@ -391,7 +391,7 @@ symbolify_oid(MiniMib, Oid) ->
 	false ->
 	    {Oid, unknown};
 	{FoundOid, Aliasname, Type} ->
- 	    Rest = snmp_misc:diff(Oid, FoundOid),
+ 	    Rest = diff(Oid, FoundOid),
  	    {[Aliasname| Rest], Type}
     end.
 

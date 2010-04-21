@@ -23,7 +23,7 @@ start_link(Server, NetIfOpts) ->
 stop(Pid) ->
     call(Pid, stop).
 
-send_pdu(Pid, Addr, Port, Pdu, MsgData) when record(Pdu, pdu) ->
+send_pdu(Pid, Addr, Port, Pdu, MsgData) when is_record(Pdu, pdu) ->
     cast(Pid, {send_pdu, Addr, Port, Pdu, MsgData}).
 
 %%%-------------------------------------------------------------------
@@ -177,10 +177,10 @@ handle_recv_msg(Addr, Port, Bytes,
 	{ok, _Vsn, #pdu{type = 'snmpv2-trap'} = Pdu, _MS, _ACM} ->
 	    Pid ! {snmp_trap, Pdu, Addr, Port};
 
-	{ok, _Vsn, Trap, _MS, _ACM} when record(Trap, trappdu) ->
+	{ok, _Vsn, Trap, _MS, _ACM} when is_record(Trap, trappdu) ->
 	    Pid ! {snmp_trap, Trap, Addr, Port};
 
-	{ok, _Vsn, Pdu, _MS, _ACM} when record(Pdu, pdu) ->
+	{ok, _Vsn, Pdu, _MS, _ACM} when is_record(Pdu, pdu) ->
 	    Pid ! {snmp_pdu, Pdu, Addr, Port};
 
 	{discarded, Reason} ->
@@ -220,9 +220,9 @@ udp_send(Sock, Addr, Port, Msg) ->
 		      "~n   ~p",[Addr, Port, Error])
     end.
 
-sz(B) when binary(B) ->
+sz(B) when is_binary(B) ->
     size(B);
-sz(L) when list(L) ->
+sz(L) when is_list(L) ->
     length(L);
 sz(_) ->
     undefined.
