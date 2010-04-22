@@ -148,7 +148,7 @@ generate_v1_v2c_msg(Vsn, Pdu, Community) ->
     end.
 
 generate_v1_v2c_outgoing_msg(Message) ->
-    case (catch snmp_pdus:enc_message_only(Message)) of
+    case (catch sesnmp_pdus:enc_message_only(Message)) of
 	{'EXIT', Reason} ->
 	    {error, Reason};
 	Bin when is_binary(Bin) ->

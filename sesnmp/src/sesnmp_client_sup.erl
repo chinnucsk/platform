@@ -28,5 +28,5 @@ init([Opts]) ->
 %%% Internal functions
 %%%-------------------------------------------------------------------
 get_opt(Opts, Key, Def) ->
-    senmp_misc:get_option(Key, Opts, Def).
+    sesnmp_misc:get_option(Key, Opts, Def).
 
