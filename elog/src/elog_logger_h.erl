@@ -190,7 +190,7 @@ write_time({{Y,Mo,D},{H,Mi,S}}, Type) ->
     io_lib:format("~n=~s==== ~w-~.2.0w-~.2.0w ~.2.0w:~.2.0w:~.2.0w ===~n",
 		  [Type, Y, Mo, D, H, Mi, S]).
 
-%% @doc Rename the log file if exists, to "*-old.log".
+%% @doc Rename the log file if exists, to "*_timestamp.log".
 %% This is needed in systems when the file must be closed before rotation (Windows).
 %% On most Unix-like system, the file can be renamed from the command line and
 %% the log can directly be reopened.
@@ -198,8 +198,11 @@ write_time({{Y,Mo,D},{H,Mi,S}}, Type) ->
 rotate_log(Filename) ->
     case file:read_file_info(Filename) of
 	{ok, _FileInfo} ->
+        {Y,M,D} = date(),
+        {H, MM, S} = time(),
 	    RotationName = filename:rootname(Filename),
-	    file:rename(Filename, [RotationName, "-old.log"]),
+        OldLog = lists:concat(['_', Y, M, D, H, MM, S, ".log"]),
+	    file:rename(Filename, [RotationName, OldLog]),
 	    ok;
 	{error, _Reason} ->
 	    ok
