@@ -424,7 +424,7 @@ handle_cast({async_create, datalog, {DbName, FileName, Datalog}}, State) ->
 		handle_update_rrdfile(RRDFile, Datalog, State),
 		{noreply, State};
 	false ->
-        ?ERROR("rrdfile does not exist for db: ~p", [DbName]),
+        ?ERROR("rrdfile does not exist for db: ~p", [RRDFile]),
 		{noreply, State}
 	end;
 
@@ -480,10 +480,12 @@ handle_template_action(Action, RRDFile, Args, #state{id = Id, rrdpid = Pid, rrdc
 					case lists:keysearch(Action, 1, Templates) of
 						{value, {_, Template}} ->
 							Cmd = parse_cmd(Template, [{rrdfile, RRDFile}, {rrdcached, " --daemon " ++ CAddr} | Args], []),
-							?INFO("~p, ~p", [Id, Cmd]),
+							?INFO("Action: ~p,~p, ~p", [Action, Id, Cmd]),
 							case apply(erlrrd, Action, [Pid, Cmd]) of
 								{ok, Resp} -> {ok, Resp};
-								{error, Error} -> {error, {500, Error}}
+								{error, Error} -> 
+                                    ?ERROR("error in action: ~p, ~p, ~p, ~p", [Action, Id, Cmd, Error]),
+                                    {error, {500, Error}}
 							end;
 						false ->
 							{error, {500, "Cannot find create template: " ++ TemplateId}}

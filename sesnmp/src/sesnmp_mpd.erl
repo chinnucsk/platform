@@ -142,7 +142,7 @@ generate_v1_v2c_msg(Vsn, Pdu, Community) ->
 		{ok, Packet} when size(Packet) =< MMS ->
             {ok, Packet};
 		{ok, Packet} ->
-            ?ERROR("packet is toobig: ~p, ~p, nms : ~p", [Packet, size(Packet)], MMS),
+            ?ERROR("packet is toobig: ~p, ~p, nms : ~p", [Packet, size(Packet), MMS]),
 		    {discarded, too_big}
 	    end
     end.
