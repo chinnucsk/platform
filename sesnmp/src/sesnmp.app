@@ -1,6 +1,6 @@
 {application, sesnmp,
  [{description, "sesnmp"},
-  {vsn, "0.1"},
+  {vsn, "1.0.0"},
   {modules, [sesnmp, 
              sesnmp_app, 
              sesnmp_client, 

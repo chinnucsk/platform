@@ -160,9 +160,10 @@ start_with_oid(Oid1, Oid2) ->
 	end.
 
 formatoid(Oid) ->
+    %bug oid 有 46 就出问题了
     DotIdx = string:chr(Oid, $.),
     if
-    DotIdx > 0 ->
+    (DotIdx > 0) and (DotIdx < 6)  ->
         [list_to_integer(O) || O <- string:tokens(Oid, ".")];
     true ->
         Oid
