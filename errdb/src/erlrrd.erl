@@ -257,7 +257,7 @@ handle_call({do, Action, Args, Timeout}, _From, #state{port = Port} = State) ->
             {response, Response} -> 
                 {reply, {ok, Response}, State};
             {error, timeout} ->
-                {error, "port timeout", State};
+                {reply, {error, "port timeout"}, State};
             {error, Error} -> 
                 {reply, {error, Error}, State}
       end;
