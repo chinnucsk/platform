@@ -12,7 +12,7 @@
 
 -define(RETRIES, 2).
 
--define(TIMEOUT, 3000).
+-define(TIMEOUT, 4000).
 
 %%Scalars = [{Name, Oid}]
 get_group(Addr, Scalars) ->
@@ -109,6 +109,8 @@ retry(Fun, R) when R < 0 ->
 retry(Fun, R) ->
     case Fun() of
     {error, {timeout, _}} -> 
+        retry(Fun, R - 1);
+    {error, timeout} -> 
         retry(Fun, R - 1);
     Result -> 
         Result
