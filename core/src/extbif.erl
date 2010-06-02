@@ -22,6 +22,9 @@ to_list(L) when is_list(L) ->
 to_list(L) when is_integer(L) ->
     integer_to_list(L);
 
+to_list(L) when is_float(L) ->
+    float_to_list(L);
+
 to_list(B) when is_binary(B) ->
     binary_to_list(B).
 
