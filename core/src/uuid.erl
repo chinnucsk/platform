@@ -1,12 +1,15 @@
 %%travis erlang uuid
 -module(uuid).
 
--export([gen/0, v4/0, to_string/1, get_parts/1, v4_uuid/0]).
+-export([gen/0, gen_b64/0, v4/0, to_string/1, get_parts/1, v4_uuid/0]).
 
 -import(random).
 
 gen() ->
     to_string(v4()).
+
+gen_b64() ->
+    string:strip(base64:encode_to_string(v4()), both, $=).
 
 v4() ->
     v4(random:uniform(round(math:pow(2, 48))) - 1, random:uniform(round(math:pow(2, 12))) - 1, random:uniform(round(math:pow(2, 32))) - 1, random:uniform(round(math:pow(2, 30))) - 1).
