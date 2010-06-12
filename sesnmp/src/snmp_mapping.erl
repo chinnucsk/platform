@@ -55,4 +55,4 @@ get_entry(Addr, Columns, Indices, AgentData) ->
     sesnmp:get_entry(Addr, Columns, Indices, AgentData).
 
 set_group(Addr, Scalars, AgentData) ->
-    sesnmp:set_group(Addr, Scalars, AgentData).
+    sesnmp:set(Addr, Scalars, AgentData).

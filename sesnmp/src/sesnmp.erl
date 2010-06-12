@@ -8,6 +8,8 @@
 
 -include_lib("snmp/include/snmp_types.hrl").
 
+-include("elog.hrl").
+
 -define(PORT, 161).
 
 -define(RETRIES, 2).
@@ -57,6 +59,7 @@ get_table(Addr, Columns, AgentData, TIMEOUT) ->
 
 get_table(Addr, Port, Columns, AgentData, TIMEOUT) ->
 	[{_, Col1Oid} | _] = Columns,
+    ?INFO("Columns :~p",[Columns]),
 	case get_table(Addr, Port, formatoid(Col1Oid), Columns, AgentData, TIMEOUT, []) of
 	{ok, Rows} ->
 		{ok, lists:reverse(Rows)};
