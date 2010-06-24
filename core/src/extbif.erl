@@ -19,6 +19,9 @@ timestamp() ->
 to_list(L) when is_list(L) ->
     L;
 
+to_list(A) when is_atom(A) ->
+    atom_to_list(A);
+
 to_list(L) when is_integer(L) ->
     integer_to_list(L);
 
@@ -51,7 +54,8 @@ to_integer(I) when is_list(I) ->
     end;
  to_integer(I) when is_binary(I) ->
      list_to_integer(binary_to_list(I));
- to_integer(I) ->
+ to_integer(_I) ->
+    %TODO: hide errors
      0.
 
 binary_to_atom(B) ->

@@ -56,29 +56,45 @@ get(Addr0, Oids, AgentData, Timeout) ->
     get(Addr0, ?PORT, Oids, AgentData, Timeout).
 
 get(Addr0, Port, Oids, AgentData, Timeout) ->
-    {ok, Addr} = inet:getaddr(Addr0, inet),
-    call({sync_get, self(), Addr, Port, Oids, AgentData, Timeout}).
+    case inet:getaddr(Addr0, inet) of
+    {ok, Addr} -> 
+        call({sync_get, self(), Addr, Port, Oids, AgentData, Timeout});
+    {error, Error} ->
+        {error, Error}
+    end.
 
 get_next(Addr0, Oids, AgentData, Timeout) ->
     get_next(Addr0, ?PORT, Oids, AgentData, Timeout). 
 
 get_next(Addr0, Port, Oids, AgentData, Timeout) ->
-    {ok, Addr} = inet:getaddr(Addr0, inet),
-    call({sync_get_next, self(), Addr, Port, Oids, AgentData, Timeout}).
+    case inet:getaddr(Addr0, inet) of
+    {ok, Addr} ->
+        call({sync_get_next, self(), Addr, Port, Oids, AgentData, Timeout});
+    {error, Error} ->
+        {error,Error}
+    end.
 
 get_bulk(Addr0, NonRep, MaxRep, Oids, AgentData, Timeout) ->
     get_bulk(Addr0, ?PORT, NonRep, MaxRep, Oids, AgentData, Timeout).
 
 get_bulk(Addr0, Port, NonRep, MaxRep, Oids, AgentData, Timeout) ->
-    {ok, Addr} = inet:getaddr(Addr0, inet),
-    call({sync_get_bulk, self(), Addr, Port, NonRep, MaxRep, Oids, AgentData, Timeout}).
+    case inet:getaddr(Addr0, inet) of
+    {ok, Addr} -> 
+        call({sync_get_bulk, self(), Addr, Port, NonRep, MaxRep, Oids, AgentData, Timeout});
+    {error, Error} ->
+        {error,Error}
+    end.
 
 set(Addr0, VarsAndVals, AgentData, Timeout) ->
     set(Addr0, ?PORT, VarsAndVals, AgentData, Timeout).
 
 set(Addr0, Port, VarsAndVals, AgentData, Timeout) ->
-    {ok, Addr} = inet:getaddr(Addr0, inet),
-    call({sync_set, self(), Addr, Port, VarsAndVals, AgentData, Timeout}).
+    case inet:getaddr(Addr0, inet) of
+    {ok, Addr} -> 
+        call({sync_set, self(), Addr, Port, VarsAndVals, AgentData, Timeout});
+    {error, Error} ->
+        {error,Error}
+    end.
 
 init([Opts]) ->
     case (catch do_init(Opts)) of
