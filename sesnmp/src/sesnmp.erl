@@ -31,6 +31,8 @@ get_group(Addr, Port, Scalars, AgentData, Timeout) ->
 	case retry(fun() -> sesnmp_client:get(Addr, Port, Oids, AgentData, Timeout) end, ?RETRIES) of
 	{ok, {noError, 0, Varbinds}, _} -> 
 		{ok, merge_vars(Names, Varbinds)};
+    {ok, Error, _} ->
+        {error, Error};
 	Error -> 
 		{error, Error}
 	end.
@@ -44,6 +46,8 @@ set(Addr, Port, VarVals, AgentData) ->
     case retry(fun() -> sesnmp_client:set(Addr, Port, VarsAndVals, AgentData, ?TIMEOUT) end, ?RETRIES) of
     {ok, {noError, 0, Varbinds}, _} ->
 		{ok, merge_vars(Names, Varbinds)}; %TODO
+    {ok, Error, _} ->
+        {error, Error};
 	Error ->
 		{error, Error}
 	end.
@@ -80,8 +84,10 @@ get_table(Addr, Port, Col1Oid, Columns, AgentData, TIMEOUT, Acc) ->
 		false ->
 			{ok, Acc}
 		end;
-	Other -> 
-		{error, Other}
+    {ok, Error, _} ->
+        {error, Error};
+	Error -> 
+		{error, Error}
 	end.
 
 get_entry(Addr, Columns, Indices) ->
@@ -96,6 +102,8 @@ get_entry(Addr, Port, Columns, Indices, AgentData) ->
     case retry(fun() -> sesnmp_client:get(Addr, Port, Oids1, AgentData, ?TIMEOUT) end, ?RETRIES) of
 	{ok, {noError, 0, Varbinds}, _} -> 
 		{ok, merge_vars(Names, Varbinds)};
+    {ok, Error, _} ->
+        {error, Error};
 	Error -> 
 		{error, Error}
 	end.
