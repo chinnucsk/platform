@@ -14,7 +14,7 @@
 
 -define(RETRIES, 2).
 
--define(TIMEOUT, 4000).
+-define(TIMEOUT, 10000).
 
 %%Scalars = [{Name, Oid}]
 get_group(Addr, Scalars) ->
