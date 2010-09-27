@@ -9,9 +9,14 @@
 %%%----------------------------------------------------------------------
 -module(extbif).
 
--export([timestamp/0, to_list/1, to_binary/1, binary_to_atom/1, to_integer/1]).
+-export([timestamp/0, 
+        to_list/1, 
+        to_binary/1, 
+        binary_to_atom/1, 
+        atom_to_binary/1,
+        binary_split/2,
+        to_integer/1]).
 
-%%unit: second
 timestamp() ->
 	{MegaSecs, Secs, _MicroSecs} = erlang:now(),
 	MegaSecs * 1000000 + Secs.
@@ -58,7 +63,19 @@ to_integer(I) when is_list(I) ->
     %TODO: hide errors
      0.
 
+atom_to_binary(A) when is_atom(A) ->
+    list_to_binary(atom_to_list(A)).
+
 binary_to_atom(B) ->
     list_to_atom(binary_to_list(B)).
 
+binary_split(<<>>, _C) -> [];
+binary_split(B, C) -> binary_split(B, C, <<>>, []).
+
+binary_split(<<C, Rest/binary>>, C, Acc, Tokens) ->
+    binary_split(Rest, C, <<>>, [Acc | Tokens]);
+binary_split(<<C1, Rest/binary>>, C, Acc, Tokens) ->
+    binary_split(Rest, C, <<Acc/binary, C1>>, Tokens);
+binary_split(<<>>, _C, Acc, Tokens) ->
+    lists:reverse([Acc | Tokens]).
 
