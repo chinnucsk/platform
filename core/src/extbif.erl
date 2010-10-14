@@ -60,7 +60,7 @@ to_integer(I) when is_list(I) ->
  to_integer(I) when is_binary(I) ->
      list_to_integer(binary_to_list(I));
  to_integer(_I) ->
-    %TODO: hide errors
+    %TODO: hide errors, should throw exception.
      0.
 
 atom_to_binary(A) when is_atom(A) ->

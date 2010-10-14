@@ -20,7 +20,10 @@
 get_group(Addr, Scalars) ->
     get_group(Addr, Scalars, []).
 
-get_group(Addr, Scalars, AgentData) ->
+get_group(Addr, Port, Scalars) when is_integer(Port) and is_list(Scalars) ->
+    get_group(Addr, Port, Scalars, []);
+
+get_group(Addr, Scalars, AgentData) when is_list(Scalars) and is_list(AgentData) ->
     get_group(Addr, ?PORT, Scalars, AgentData).
 
 get_group(Addr, Port, Scalars, AgentData) ->
@@ -58,8 +61,13 @@ get_table(Addr, Columns) ->
 get_table(Addr, Columns, AgentData) ->
     get_table(Addr, ?PORT, Columns, AgentData, ?TIMEOUT).
 
-get_table(Addr, Columns, AgentData, TIMEOUT) ->
-    get_table(Addr, ?PORT, Columns, AgentData, TIMEOUT).
+get_table(Addr, Port, Columns, AgentData) 
+    when is_integer(Port) and is_list(Columns) ->
+    get_table(Addr, Port, Columns, AgentData, ?TIMEOUT);
+
+get_table(Addr, Columns, AgentData, Timeout) 
+    when is_list(Columns) and is_integer(Timeout) ->
+    get_table(Addr, ?PORT, Columns, AgentData, Timeout).
 
 get_table(Addr, Port, Columns, AgentData, TIMEOUT) ->
 	[{_, Col1Oid} | _] = Columns,
