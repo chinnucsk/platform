@@ -20,7 +20,10 @@
 get_group(Addr, Scalars) ->
     get_group(Addr, Scalars, []).
 
-get_group(Addr, Scalars, AgentData) ->
+get_group(Addr, Port, Scalars) when is_integer(Port) and is_list(Scalars) ->
+    get_group(Addr, Port, Scalars, []);
+
+get_group(Addr, Scalars, AgentData) when is_list(Scalars) and is_list(AgentData) ->
     get_group(Addr, ?PORT, Scalars, AgentData).
 
 get_group(Addr, Port, Scalars, AgentData) ->
@@ -31,6 +34,8 @@ get_group(Addr, Port, Scalars, AgentData, Timeout) ->
 	case retry(fun() -> sesnmp_client:get(Addr, Port, Oids, AgentData, Timeout) end, ?RETRIES) of
 	{ok, {noError, 0, Varbinds}, _} -> 
 		{ok, merge_vars(Names, Varbinds)};
+    {ok, Error, _} ->
+        {error, Error};
 	Error -> 
 		{error, Error}
 	end.
@@ -44,6 +49,8 @@ set(Addr, Port, VarVals, AgentData) ->
     case retry(fun() -> sesnmp_client:set(Addr, Port, VarsAndVals, AgentData, ?TIMEOUT) end, ?RETRIES) of
     {ok, {noError, 0, Varbinds}, _} ->
 		{ok, merge_vars(Names, Varbinds)}; %TODO
+    {ok, Error, _} ->
+        {error, Error};
 	Error ->
 		{error, Error}
 	end.
@@ -54,8 +61,13 @@ get_table(Addr, Columns) ->
 get_table(Addr, Columns, AgentData) ->
     get_table(Addr, ?PORT, Columns, AgentData, ?TIMEOUT).
 
-get_table(Addr, Columns, AgentData, TIMEOUT) ->
-    get_table(Addr, ?PORT, Columns, AgentData, TIMEOUT).
+get_table(Addr, Port, Columns, AgentData) 
+    when is_integer(Port) and is_list(Columns) ->
+    get_table(Addr, Port, Columns, AgentData, ?TIMEOUT);
+
+get_table(Addr, Columns, AgentData, Timeout) 
+    when is_list(Columns) and is_integer(Timeout) ->
+    get_table(Addr, ?PORT, Columns, AgentData, Timeout).
 
 get_table(Addr, Port, Columns, AgentData, TIMEOUT) ->
 	[{_, Col1Oid} | _] = Columns,
@@ -80,8 +92,10 @@ get_table(Addr, Port, Col1Oid, Columns, AgentData, TIMEOUT, Acc) ->
 		false ->
 			{ok, Acc}
 		end;
-	Other -> 
-		{error, Other}
+    {ok, Error, _} ->
+        {error, Error};
+	Error -> 
+		{error, Error}
 	end.
 
 get_entry(Addr, Columns, Indices) ->
@@ -96,6 +110,8 @@ get_entry(Addr, Port, Columns, Indices, AgentData) ->
     case retry(fun() -> sesnmp_client:get(Addr, Port, Oids1, AgentData, ?TIMEOUT) end, ?RETRIES) of
 	{ok, {noError, 0, Varbinds}, _} -> 
 		{ok, merge_vars(Names, Varbinds)};
+    {ok, Error, _} ->
+        {error, Error};
 	Error -> 
 		{error, Error}
 	end.

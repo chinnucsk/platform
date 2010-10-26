@@ -11,13 +11,7 @@
 
 -export([hash/1, max/0]).
 
-%%--------------------------------------------------------------------
-%% @doc Hashes string
-%% @spec hash(String) -> Hash
-%%  String = iolist()
-%%  Hash = integer()
-%% @end
-%%--------------------------------------------------------------------
+%% @doc hash
 hash(String) when is_list(String) ->
     <<Hash:160>> = sha1:binstring(String),
     Hash.
