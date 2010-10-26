@@ -4,21 +4,21 @@
 %% @doc Http server for errdb.
 -module(errdb_httpd).
 
--export([start/1, stop/0, loop/2]).
-
 -include("elog.hrl").
+
+-export([start/1, 
+        loop/1, 
+        stop/0]).
 
 %% External API
 start(Options) ->
-    {DocRoot, Options1} = get_option(docroot, Options),
-    Loop = fun (Req) -> ?MODULE:loop(Req, DocRoot) end,
     ?INFO("Errdb httpd is started...[ok]", []),
-    mochiweb_http:start([{name, ?MODULE}, {loop, Loop} | Options1]).
+    mochiweb_http:start([{name, ?MODULE}, {loop, fun loop/1} | Options]).
 
 stop() ->
     mochiweb_http:stop(?MODULE).
 
-loop(Req, _DocRoot) ->
+loop(Req) ->
     Method = Req:get(method),
 	Path = list_to_tuple(string:tokens(Req:get(path), "/")),
     ?INFO("HTTP Req: ~p", [Path]),
@@ -319,10 +319,6 @@ handle('DELETE', {"rrdgraph_templates", TemplateName}, Req) ->
 
 handle(_Other, _Path, Req) ->
 	Req:respond({500, [], <<"unsupported request">>}). 
-	
-%% Internal API
-get_option(Option, Options) ->
-    {proplists:get_value(Option, Options), proplists:delete(Option, Options)}.
 
 to_rrdb(Dn) ->
   Idx = string:chr(Dn, $=),

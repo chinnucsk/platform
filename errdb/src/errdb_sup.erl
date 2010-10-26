@@ -62,27 +62,11 @@ init([Opts]) ->
       end || I <- lists:seq(0, PoolSize)],
 
 	%% Httpd config
-	{ok, HttpdConf} = case application:get_env(httpd) of
-		{ok, Conf} ->
-			NewConf = lists:keymerge(1, Conf, [{ip, mochiweb(ip)}, {port, mochiweb(port)}, {docroot, errdb_deps:local_path(["priv", "www"])}]),
-			{ok, NewConf};
-		false ->
-			{ok, [{ip, mochiweb(ip)}, {port, mochiweb(port)}, {docroot, errdb_deps:local_path(["priv", "www"])}]}
-	end,
-
+	{ok, HttpdConf} = application:get_env(httpd), 
 	%% Httpd 
     Httpd = {errdb_httpd, {errdb_httpd, start, [HttpdConf]},
            permanent, 10, worker, [errdb_httpd]},
 
 	%% Errdb
     {ok, {{one_for_one, 10, 100}, lists:append([[Monitor, Template], Errdbs, [Httpd]])}}.
-
-mochiweb(ip) ->
-	case os:getenv("MOCHIWEB_IP") of false -> "0.0.0.0"; Any -> Any end;   
-
-mochiweb(port) ->
-	case os:getenv("MOCHIWEB_PORT") of false -> 8000; Any -> Any end;
-
-mochiweb(docroot) ->
-	["priv", "www"].
 

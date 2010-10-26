@@ -1,6 +1,6 @@
 {application, errdb,
  [{description, "errdb"},
-  {vsn, "1.0"},
+  {vsn, "2.0"},
   {modules, [
     errdb,
     errdb_app,
