@@ -38,7 +38,8 @@ to_list(B) when is_binary(B) ->
 
 to_binary(B) when is_binary(B) ->
     B;
-
+to_binary(B) when is_integer(B) ->
+    B;
 to_binary(L) when is_list(L) ->
     list_to_binary(L).
 
