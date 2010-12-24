@@ -472,29 +472,32 @@ handle_update_rrdfile(RRDFile, Datalog, State) ->
 handle_graph_rrdfile(ImgFile, RRDFile, Args, State) ->
 	handle_template_action(graph, RRDFile, [{imagefile, ImgFile} | Args], State).
 
-handle_template_action(Action, RRDFile, Args, #state{id = Id, rrdpid = Pid, rrdcached = CAddr} = _State) ->
+handle_template_action(Action, RRDFile0, Args, #state{id = Id, rrdpid = Pid, rrdcached = CAddr} = _State) ->
+    %TODO: fix mac bugs
+    RRDFile1 = binary:replace(list_to_binary(RRDFile0), <<":">>, <<"_">>, [gloabl]),
+    RRDFile = binary_to_list(RRDFile1),
 	case lists:keysearch(template, 1, Args) of
-		{value, {template, TemplateId}} ->
-			case errdb_template:lookup(TemplateId) of
-				[{_, Templates}] ->
-					case lists:keysearch(Action, 1, Templates) of
-						{value, {_, Template}} ->
-							Cmd = parse_cmd(Template, [{rrdfile, RRDFile}, {rrdcached, " --daemon " ++ CAddr} | Args], []),
-							?INFO("Action: ~p,~p, ~p", [Action, Id, Cmd]),
-							case apply(erlrrd, Action, [Pid, Cmd]) of
-								{ok, Resp} -> {ok, Resp};
-								{error, Error} -> 
-                                    ?ERROR("error in action: ~p, ~p, ~p, ~p", [Action, Id, Cmd, Error]),
-                                    {error, {500, Error}}
-							end;
-						false ->
-							{error, {500, "Cannot find create template: " ++ TemplateId}}
-					end;
-				[] ->
-					{error, {500, "Cannot find template: " ++ TemplateId}}
-			end;	
-		false ->
-			{error, {400, "No 'template' in params"}}
+    {value, {template, TemplateId}} ->
+        case errdb_template:lookup(TemplateId) of
+            [{_, Templates}] ->
+                case lists:keysearch(Action, 1, Templates) of
+                    {value, {_, Template}} ->  %{rrdcached, " --daemon " ++ CAddr}
+                        Cmd = parse_cmd(Template, [{rrdfile, RRDFile}, {rrdcached, " --daemon " ++ CAddr} | Args], []),
+                        ?INFO("Action: ~p,~p, ~p", [Action, Id, Cmd]),
+                        case apply(erlrrd, Action, [Pid, Cmd]) of
+                            {ok, Resp} -> {ok, Resp};
+                            {error, Error} -> 
+                                ?ERROR("error in action: ~p, ~p, ~p, ~p", [Action, Id, Cmd, Error]),
+                                {error, {500, Error}}
+                        end;
+                    false ->
+                        {error, {500, "Cannot find create template: " ++ TemplateId}}
+                end;
+            [] ->
+                {error, {500, "Cannot find template: " ++ TemplateId}}
+        end;	
+    false ->
+        {error, {400, "No 'template' in params"}}
 	end.
 
 parse_cmd([H|T],Args,Acc) ->
@@ -513,6 +516,9 @@ parse_cmd([H|T],Args,Acc) ->
 parse_cmd([],_Args,Acc) -> 
     lists:reverse(Acc).
 
+to_string(noSuchInstance) ->
+    ?ERROR("noSuchInstance Got",[]),
+    "0";
 to_string(Value) ->
     if
     	is_integer(Value) -> integer_to_list(Value);
