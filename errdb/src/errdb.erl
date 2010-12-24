@@ -474,7 +474,7 @@ handle_graph_rrdfile(ImgFile, RRDFile, Args, State) ->
 
 handle_template_action(Action, RRDFile0, Args, #state{id = Id, rrdpid = Pid, rrdcached = CAddr} = _State) ->
     %TODO: fix mac bugs
-    RRDFile1 = binary:replace(list_to_binary(RRDFile0), <<":">>, <<"_">>, [gloabl]),
+    RRDFile1 = binary:replace(list_to_binary(RRDFile0), <<":">>, <<"_">>, [global]),
     RRDFile = binary_to_list(RRDFile1),
 	case lists:keysearch(template, 1, Args) of
     {value, {template, TemplateId}} ->
