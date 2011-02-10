@@ -1,0 +1,17 @@
+data/.hgignore.i
+data/LICENSE.i
+data/Makefile.i
+data/ebin/erldis.app.i
+data/include/erldis.hrl.i
+data/src/Makefile.i
+data/src/client.erl.i
+data/src/erldis.erl.i
+data/src/erldis_app.erl.i
+data/src/erldis_client.erl.i
+data/src/erldis_proto.erl.i
+data/src/erldis_sup.erl.i
+data/src/proto.erl.i
+data/support/include.mk.i
+data/test/Makefile.i
+data/test/erldis_tests.erl.i
+data/test/proto_tests.erl.i
