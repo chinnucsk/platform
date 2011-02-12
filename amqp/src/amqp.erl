@@ -14,245 +14,299 @@
 
 -include("amqp_client.hrl").
 
--export([start_link/1, stop/0]).
+-import(dataset, [get_value/2, get_value/3]).
+
+-export([start_link/1,
+         start_link/2, 
+         stop/0, 
+         stop/1]).
 
 %%api 
--export([queue/0, queue/1, queue/2, 
-         exchange/1, exchange/2, exchange/3,
-         direct/1, direct/2, 
-         topic/1, topic/2, 
-         fanout/1, fanout/2, 
-         bind/2, bind/3, 
-         unbind/2,
-         send/2,
-         publish/2, publish/3, publish/4,
-         delete/2,
-         consume/1, consume/2, 
-         get/1,
-         ack/1, 
-         cancel/1 %,close/0
+-export([queue/1, queue/2, queue/3,
+         exchange/2, exchange/3, exchange/4,
+         direct/2, direct/3,
+         topic/2, topic/3,
+         fanout/2, fanout/3,
+         bind/3, bind/4, 
+         unbind/3,
+         send/3,
+         publish/3, publish/4, publish/5,
+         delete/3,
+         consume/2, consume/3, 
+         get/2,
+         ack/2, 
+         cancel/2 %,close/0
          ]).
 
 %%callbacks
--export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
+-export([init/1, 
+        handle_call/3, 
+        handle_cast/2, 
+        handle_info/2, 
+        terminate/2, 
+        code_change/3]).
 
--record(state, {params, realm, connection, channel, ticket}).
+-record(state, {params, realm, connection, channel, ticket, dict}).
 
 %% @spec start_link(Opts) -> Result
 %%  Opts = [tuple()]
 %%  Result = {ok, pid()}  | {error, Error}  
 %% @doc stop amqp client
 start_link(Opts) ->
-    gen_server:start_link({local, ?MODULE}, ?MODULE, [Opts], []).
+    start_link(?MODULE, Opts).
+
+%% @spec start_link(Name, Opts) -> Result
+%%  Name = atom()
+%%  Opts = [tuple()]
+%%  Result = {ok, pid()}  | {error, Error}  
+%% @doc stop amqp client
+start_link(Name, Opts) ->
+    gen_server:start_link({local, Name}, ?MODULE, [Opts], []).
 
 %% @spec stop() -> ok
 %% @doc stop amqp client
 stop() ->
-    gen_server:call(?MODULE, stop).
+    stop(?MODULE).
 
-%% @spec queue() -> Result
-%%  Name = iolist()
+%% @spec stop(Name) -> ok
+%%  Name = atom()
+%% @doc stop amqp client
+stop(Name) ->
+    gen_server:call(Name, stop).
+    
+%% @spec queue(Pid) -> Result
+%%  Pid = pid() | atom()
 %%  Result = {ok, Q, Props} | {error,Error}
 %%  Q = iolist()
 %%  Props = [tuple()]
 %% @doc declare temporary queue
-queue() ->
-    call(queue).
+queue(Pid) ->
+    call(Pid, queue).
 
-%% @spec queue(Name) -> Result
+%% @spec queue(Pid, Name) -> Result
+%%  Pid = pid() | atom()
 %%  Name = iolist()
 %%  Result = ok | {error,Error}
 %% @doc declare amqp queue
-queue(Name) ->
-    call({queue, binary(Name)}).
+queue(Pid, Name) ->
+    call(Pid, {queue, binary(Name)}).
 
-%% @spec queue(Name, Opts) -> Result
+%% @spec queue(Pid, Name, Opts) -> Result
+%%  Pid = pid() | atom()
 %%  Name = iolist()
 %%  Opts = list()
 %%  Result = ok | {error,Error}
 %% @doc declare amqp queue
-queue(Name, Opts) ->
-    call({queue, binary(Name), Opts}).
+queue(Pid, Name, Opts) ->
+    call(Pid, {queue, binary(Name), Opts}).
 
-%% @spec exchange(Name) -> Result
+%% @spec exchange(Pid, Name) -> Result
+%%  Pid = pid() | atom()
 %%  Name = iolist()
 %%  Result = ok | {error,Error}
 %% @doc declare amqp exchange with default type 'direct'
-exchange(Name) ->
-    call({exchange, binary(Name)}).
+exchange(Pid, Name) ->
+    call(Pid, {exchange, binary(Name)}).
 
-%% @spec exchange(Name, Type) -> Result
+%% @spec exchange(Pid, Name, Type) -> Result
+%%  Pid = pid() | atom()
 %%  Name = iolist()
 %%  Type = iolist()
 %%  Result = ok | {error,Error}
 %% @doc declare amqp exchange
-exchange(Name, Type) ->
-    call({exchange, binary(Name), Type}).
+exchange(Pid, Name, Type) ->
+    call(Pid, {exchange, binary(Name), Type}).
 
-%% @spec exchange(Name, Type, Opts) -> Result
+%% @spec exchange(Pid, Name, Type, Opts) -> Result
+%%  Pid = pid() | atom()
 %%  Name = iolist()
 %%  Type = iolist()
 %%  Opts = list()
 %%  Result = ok | {error,Error}
 %% @doc declare amqp exchange
-exchange(Name, Type, Opts) ->
-    call({exchange, binary(Name), Type, Opts}).
+exchange(Pid, Name, Type, Opts) ->
+    call(Pid, {exchange, binary(Name), Type, Opts}).
 
-%% @spec direct(Name) -> Result
+%% @spec direct(Pid, Name) -> Result
+%%  Pid = pid() | atom()
 %%  Name = iolist()
 %%  Result = ok | {error,Error}
 %% @doc declare amqp direct exchange
-direct(Name) ->
-    call({direct, binary(Name)}).
+direct(Pid, Name) ->
+    call(Pid, {direct, binary(Name)}).
 
-%% @spec direct(Name, Opts) -> Result
+%% @spec direct(Pid, Name, Opts) -> Result
+%%  Pid = pid() | atom()
 %%  Name = iolist()
 %%  Opts = list()
 %%  Result = ok | {error,Error}
 %% @doc declare amqp direct exchange
-direct(Name, Opts) ->
-    call({direct, binary(Name), Opts}).
+direct(Pid, Name, Opts) ->
+    call(Pid, {direct, binary(Name), Opts}).
 
-%% @spec topic(Name) -> Result
+%% @spec topic(Pid, Name) -> Result
+%%  Pid = pid() | atom()
 %%  Name = iolist()
 %%  Result = ok | {error,Error}
 %% @doc declare amqp topic exchange
-topic(Name) ->
-    call({topic, binary(Name)}).
+topic(Pid, Name) ->
+    call(Pid, {topic, binary(Name)}).
 
-%% @spec topic(Name, Opts) -> Result
+%% @spec topic(Pid, Name, Opts) -> Result
+%%  Pid = pid() | atom()
 %%  Name = iolist()
 %%  Opts = list()
 %%  Result = ok | {error,Error}
 %% @doc declare amqp topic exchange
-topic(Name, Opts) ->
-    call({topic, binary(Name), Opts}).
+topic(Pid, Name, Opts) ->
+    call(Pid, {topic, binary(Name), Opts}).
 
-%% @spec fanout(Name) -> Result
+%% @spec fanout(Pid, Name) -> Result
+%%  Pid = pid() | atom()
 %%  Name = iolist()
 %%  Result = ok | {error,Error}
 %% @doc declare amqp fanout
-fanout(Name) ->
-    call({fanout, binary(Name)}).
+fanout(Pid, Name) ->
+    call(Pid, {fanout, binary(Name)}).
 
-%% @spec fanout(Name, Opts) -> Result
+%% @spec fanout(Pid, Name, Opts) -> Result
+%%  Pid = pid() | atom()
 %%  Name = iolist()
 %%  Opts = list()
 %%  Result = ok | {error,Error}
 %% @doc declare amqp fanout
-fanout(Name, Opts) ->
-    call({fanout, binary(Name), Opts}).
+fanout(Pid, Name, Opts) ->
+    call(Pid, {fanout, binary(Name), Opts}).
 
-%% @spec bind(Exchange, Queue) -> Result
+%% @spec bind(Pid, Exchange, Queue) -> Result
+%%  Pid = pid() | atom()
 %%  Exchange = iolist()
 %%  Queue = iolist()
 %%  Result = ok | {error,Error}
 %% @doc amqp bind
-bind(Exchange, Queue) ->
-    call({bind, binary(Exchange), binary(Queue)}).
+bind(Pid, Exchange, Queue) ->
+    call(Pid, {bind, binary(Exchange), binary(Queue)}).
 
-%% @spec bind(Exchange, Queue, RouteKey) -> Result
+%% @spec bind(Pid, Exchange, Queue, RouteKey) -> Result
+%%  Pid = pid() | atom()
 %%  Exchange = iolist()
 %%  Queue = iolist()
 %%  Opts = list()
 %%  Result = ok | {error,Error}
 %% @doc amqp bind
-bind(Exchange, Queue, RoutingKey) ->
-    call({bind, binary(Exchange), binary(Queue), binary(RoutingKey)}).
+bind(Pid, Exchange, Queue, RoutingKey) ->
+    call(Pid, {bind, binary(Exchange), binary(Queue), binary(RoutingKey)}).
 
-%% @spec unbind(Exchange, Queue) -> Result
+%% @spec unbind(Pid, Exchange, Queue) -> Result
+%%  Pid = pid() | atom()
 %%  Exchange = iolist()
 %%  Queue = iolist()
 %%  Result = ok | {error,Error}
 %% @doc amqp bind
-unbind(Exchange, Queue) ->
-    call({unbind, binary(Exchange), binary(Queue)}).
+unbind(Pid, Exchange, Queue) ->
+    call(Pid, {unbind, binary(Exchange), binary(Queue)}).
 
-%% @spec send(Queue, Payload) -> Result
+%% @spec send(Pid, Queue, Payload) -> Result
+%%  Pid = pid() | atom()
 %%  Queue = iolist()
 %%  Payload = binary()
 %% @doc send directly to queue
-send(Queue, Payload) ->
-    gen_server:cast(?MODULE, {send, binary(Queue), binary(Payload)}).
+send(Pid, Queue, Payload) ->
+    cast(Pid, {send, binary(Queue), binary(Payload)}).
 
-%% @spec publish(Exchange, Payload) -> Result
+%% @spec publish(Pid, Exchange, Payload) -> Result
+%%  Pid = pid() | atom()
 %%  Exchange = iolist()
 %%  Payload = binary()
 %% @doc amqp publish message
-publish(Exchange, Payload) ->
-    gen_server:cast(?MODULE, {publish, binary(Exchange), binary(Payload), <<"">>}).
+publish(Pid, Exchange, Payload) ->
+    cast(Pid, {publish, binary(Exchange), binary(Payload), <<"">>}).
 
-%% @spec publish(Exchange, Payload, RoutingKey) -> Result
+%% @spec publish(Pid, Exchange, Payload, RoutingKey) -> Result
+%%  Pid = pid() | atom()
 %%  Exchange = iolist()
 %%  Payload = binary()
 %%  RoutingKey = iolist()
 %% @doc amqp publish message
-publish(Exchange, Payload, RoutingKey) ->
-    gen_server:cast(?MODULE, {publish, binary(Exchange), binary(Payload), binary(RoutingKey)}).
+publish(Pid, Exchange, Payload, RoutingKey) ->
+    cast(Pid, {publish, binary(Exchange), binary(Payload), binary(RoutingKey)}).
 
-%% @spec publish(Exchange, Properties, Payload, RoutingKey) -> Result
+%% @spec publish(Pid, Exchange, Properties, Payload, RoutingKey) -> Result
+%%  Pid = pid() | atom()
 %%  Exchange = iolist()
 %%  Properties = [tuple()]
 %%  Payload = binary()
 %%  RoutingKey = iolist()
 %% @doc amqp publish message
-publish(Exchange, Properties, Payload, RoutingKey) ->
-    gen_server:cast(?MODULE, {publish, binary(Exchange), Properties, binary(Payload), binary(RoutingKey)}).
+publish(Pid, Exchange, Properties, Payload, RoutingKey) ->
+    cast(Pid, {publish, binary(Exchange), Properties, binary(Payload), binary(RoutingKey)}).
 
-%% @spec get(Queue) -> Result
+%% @spec get(Pid, Queue) -> Result
+%%  Pid = pid() | atom()
 %%  Queue = iolist()
 %%  Result = ok | {error,Error}
 %% @doc subscribe to a queue
-get(Queue) ->
-    call({get, binary(Queue)}).
+get(Pid, Queue) ->
+    call(Pid, {get, binary(Queue)}).
 
-%% @spec consume(Queue) -> Result
+%% @spec consume(Pid, Queue) -> Result
+%%  Pid = pid() | atom()
 %%  Queue = iolist()
 %%  Result = ok | {error,Error}
 %% @doc subscribe to a queue
-consume(Queue) ->
-    call({consume, binary(Queue), self()}).
+consume(Pid, Queue) ->
+    call(Pid, {consume, binary(Queue), self()}).
 
-%% @spec consume(Queue, Consumer) -> Result
+%% @spec consume(Pid, Queue, Consumer) -> Result
+%%  Pid = pid() | atom()
 %%  Queue = iolist()
 %%  Consumer = pid() | fun()
 %%  Result = ok | {error,Error}
 %% @doc subscribe to a queue
-consume(Queue, Consumer) ->
-    call({consume, binary(Queue), Consumer}).
+consume(Pid, Queue, Consumer) ->
+    call(Pid, {consume, binary(Queue), Consumer}).
 
-%% @spec delete(queue, Queue) -> Result
+%% @spec delete(Pid, queue, Queue) -> Result
+%%  Pid = pid() | atom()
 %%  Queue = iolist()
 %%  Result = ok | {error,Error}
 %% @doc delete a queue
-delete(queue, Queue) ->
-    gen_server:call(?MODULE, {delete, queue, binary(Queue)});
+delete(Pid, queue, Queue) ->
+    call(Pid, {delete, queue, binary(Queue)});
 
-%% @spec delete(exchange, Exchange) -> Result
+%% @spec delete(Pid, exchange, Exchange) -> Result
+%%  Pid = pid() | atom()
 %%  Exchange = iolist()
 %%  Result = ok | {error,Error}
 %% @doc delete an exchange
-delete(exchange, Exchange) ->
-    gen_server:call(?MODULE, {delete, exchange, binary(Exchange)}).
+delete(Pid, exchange, Exchange) ->
+    call(Pid, {delete, exchange, binary(Exchange)}).
 
-%% @spec ack(DeliveryTag) -> Result
+%% @spec ack(Pid, DeliveryTag) -> Result
+%%  Pid = pid() | atom()
 %%  DeliveryTag = iolist()
 %%  Result = ok | {error,Error}
 %% @doc ack a message
-ack(DeliveryTag) ->
-    gen_server:cast(?MODULE, {ack, binary(DeliveryTag)}).
+ack(Pid, DeliveryTag) ->
+    cast(Pid, {ack, binary(DeliveryTag)}).
 
-%% @spec cancel(ConsumerTag) -> Result
+%% @spec cancel(Pid, ConsumerTag) -> Result
+%%  Pid = pid() | atom()
 %%  ConsumerTag = iolist()
 %%  Result = ok | {error,Error}
 %% @doc cancel a consumer
-cancel(ConsumerTag) ->
-    gen_server:cast(?MODULE, {cancel, binary(ConsumerTag)}).
+cancel(Pid, ConsumerTag) ->
+    cast(Pid, {cancel, binary(ConsumerTag)}).
 
 %%  close() -> Result
 %%  close a channel
 %close() ->
 %    call(close).
+call(Pid, Req) ->
+    gen_server:call(Pid, Req).
+
+cast(Pid, Msg) ->
+    gen_server:cast(Pid, Msg).
 
 %%--------------------------------------------------------------------
 %% Function: init(Args) -> {ok, State} |
@@ -264,11 +318,7 @@ cancel(ConsumerTag) ->
 init([Opts]) ->
     case do_init(Opts) of
     {ok, State} ->
-        ets:new(queue, [set, protected, named_table]),
-        ets:new(exchange, [set, protected, named_table]),
-        ets:new(consumer, [set, protected, named_table]),
-        io:format("~n~s: amqp is starting...[done]~n", [node()]),
-        {ok, State};
+        {ok, State#state{dict = dict:new()}};
     {error, Error} ->
         {stop, Error};
     {'EXIT', Reason} ->
@@ -276,7 +326,7 @@ init([Opts]) ->
     end.
 
 do_init(Opts) ->
-    process_flag(trap_exit, true),
+    %process_flag(trap_exit, true),
     {value, Host} = dataset:get_value(host, Opts, "localhost"),
     {value, Port} = dataset:get_value(port, Opts, 5672),
     {value, VHost} = dataset:get_value(vhost, Opts, <<"/">>),
@@ -313,63 +363,60 @@ connect(Params, Realm) ->
 %%--------------------------------------------------------------------
 handle_call(queue, _From, State) ->
     {ok, Q} = declare_queue(State),
-    ets:insert(queue, {Q, true}),
-    {reply, {ok, Q}, State};
+    {reply, {ok, Q}, store({queue, Q}, true, State)};
 
 handle_call({queue, Name}, _From, State) ->
     {ok, Q} = declare_queue(Name, [], State),
-    ets:insert(queue, {Name, true}),
-    {reply, {ok, Q}, State};
+    {reply, {ok, Q}, store({queue, Name}, true, State)};
 
 handle_call({queue, Name, Opts}, _From, State) ->
     {ok, Q} = declare_queue(Name, Opts, State),
-    ets:insert(queue, {Name, true}),
-    {reply, {ok, Q}, State};
+    {reply, {ok, Q}, store({queue, Name}, true, State)};
 
 handle_call({exchange, Name}, _From, State) ->
     declare_exchange(Name, <<"direct">>, [], State),
-    ets:insert(exchange, {Name, <<"direct">>, []}),
-    {reply, ok, State};
+    NewState = store({exchange, Name}, {direct, []}, State),
+    {reply, ok, NewState};
 
 handle_call({exchange, Name, Type}, _From, State) ->
     declare_exchange(Name, Type, [], State),
-    ets:insert(exchange, {Name, Type, []}),
-    {reply, ok, State};
+    NewState = store({exchange, Name}, {Type, []}, State),
+    {reply, ok, NewState};
 
 handle_call({exchange, Name, Type, Opts}, _From, State) ->
     declare_exchange(Name, Type, Opts, State),
-    ets:insert(exchange, {Name, Type, Opts}),
-    {reply, ok, State};
+    NewState = store({exchange, Name}, {Type, []}, State),
+    {reply, ok, NewState};
 
 handle_call({direct, Name}, _From, State) ->   
     declare_exchange(Name, <<"direct">>, [], State),
-    ets:insert(exchange, {Name, <<"direct">>, []}),
-    {reply, ok, State};
+    NewState = store({exchange, Name}, {direct, []}, State),
+    {reply, ok, NewState};
 
 handle_call({direct, Name, Opts}, _From, State) ->   
     declare_exchange(Name, <<"direct">>, Opts, State),
-    ets:insert(exchange, {Name, <<"direct">>, Opts}),
-    {reply, ok, State};
+    NewState = store({exchange, Name}, {direct, Opts}, State),
+    {reply, ok, NewState};
 
 handle_call({topic, Name}, _From, State) ->   
     declare_exchange(Name, <<"topic">>, [], State),
-    ets:insert(exchange, {Name, <<"topic">>, []}),
-    {reply, ok, State};
+    NewState = store({exchange, Name}, {topic, []}, State),
+    {reply, ok, NewState};
 
 handle_call({topic, Name, Opts}, _From, State) ->   
     declare_exchange(Name, <<"topic">>, Opts, State),
-    ets:insert(exchange, {Name, <<"topic">>, Opts}),
-    {reply, ok, State};
+    NewState = store({exchange, Name}, {topic, Opts}, State),
+    {reply, ok, NewState};
 
 handle_call({fanout, Name}, _From, State) ->   
     declare_exchange(Name, <<"fanout">>, [], State),
-    ets:insert(exchange, {Name, <<"fanout">>, []}),
-    {reply, ok, State};
+    NewState = store({exchange, Name}, {fanout, []}, State),
+    {reply, ok, NewState};
 
 handle_call({fanout, Name, Opts}, _From, State) ->   
     declare_exchange(Name, <<"fanout">>, Opts, State),
-    ets:insert(exchange, {Name, <<"fanout">>, Opts}),
-    {reply, ok, State};
+    NewState = store({exchange, Name}, {fanout, Opts}, State),
+    {reply, ok, NewState};
 
 handle_call({bind, Exchange, Queue}, _From, State) -> 
     bind_queue(Exchange, Queue, <<"">>, State),
@@ -392,29 +439,29 @@ handle_call({get, Queue}, _From, State) ->
     end;
 
 handle_call({consume, Queue, Consumer}, _From, State) ->
-    Reply = case basic_consume(Queue, State) of
+    case basic_consume(Queue, State) of
     {ok, ConsumerTag} -> 
         MonRef = erlang:monitor(process, Consumer),
-        ets:insert(consumer, {ConsumerTag, Consumer, MonRef}), 
-        {ok, ConsumerTag};
+        NewState = store({consumer, ConsumerTag}, {Consumer, MonRef}, State),
+        {reply, {ok, ConsumerTag}, NewState};
     {error, Reason} ->
-        {error, Reason}
-    end,
-    {reply, Reply, State};
+        {reply, {error, Reason}, State}
+    end;
 
-handle_call({cancel, ConsumerTag}, _From, State) ->
+handle_call({cancel, ConsumerTag}, _From, #state{dict = D} = State) ->
     basic_cancel(ConsumerTag, State),
-    {reply, ok, State};
+    NewDict = dict:erase({consumer, ConsumerTag}, D),
+    {reply, ok, State#state{dict = NewDict}};
 
-handle_call({delete, queue, Queue}, _From, State) ->
+handle_call({delete, queue, Queue}, _From, #state{dict = D} = State) ->
     delete_queue(Queue, State),
-    ets:delete(queue, Queue),
-    {reply, ok, State};
+    NewDict = dict:erase({queue, Queue}, D),
+    {reply, ok, State#state{dict = NewDict}};
 
-handle_call({delete, exchange, Exchange}, _From, State) ->
+handle_call({delete, exchange, Exchange}, _From, #state{dict = D} = State) ->
     delete_exchange(Exchange, State),
-    ets:delete(exchange, Exchange),
-    {reply, ok, State};
+    NewDict = dict:erase({exchange, Exchange}, D),
+    {reply, ok, State#state{dict = NewDict}};
 
 handle_call(close, _From, #state{channel = Channel} = State) ->
     amqp_channel:close(Channel),
@@ -463,34 +510,36 @@ handle_info({#'basic.deliver'{consumer_tag=ConsumerTag,
     delivery_tag=_DeliveryTag, 
     redelivered=_Redelivered, 
     exchange=_Exchange, 
-    routing_key=RoutingKey}, #amqp_msg{props = Properties, payload = Payload} = _Msg}, State) ->
+    routing_key=RoutingKey}, #amqp_msg{props = Properties, payload = Payload} = _Msg}, 
+    #state{dict = Dict} = State) ->
     #'P_basic'{content_type = ContentType} = Properties,
     %?INFO("delivery got!"
     %        "~n from exchange: ~p" 
     %        "~n routing key: ~p"
     %        "~n content type: ~p", [Exchange, RoutingKey, ContentType]),
-    case ets:lookup(consumer, ConsumerTag) of
-    [{_Tag, Consumer, _Ref}] ->
+    case dict:find({consumer, ConsumerTag}, Dict) of
+    {ok, {Consumer, _Ref}} ->
         Consumer ! {deliver, RoutingKey, [{content_type, ContentType}], Payload};
-    [] -> 
-        ?WARNING("no available consumer for: ~p", [ConsumerTag])
+    error -> 
+        ?ERROR("no available consumer for: ~p", [ConsumerTag])
     end,
     {noreply, State};
 
-handle_info({'DOWN', MonRef, _Type, _Object, _Info}, State) ->
-    case ets:match(consumer, {'$1', '_', MonRef}) of
-    [] -> 
-        ?WARNING("unexpected monitor down: ~p", [MonRef]);
-    Consumers -> 
-        lists:foreach(fun([Tag]) -> 
-            basic_cancel(Tag, State), 
-            ets:delete(consumer, Tag) 
-        end, Consumers)
-    end,
-    {noreply, State};
+handle_info({'DOWN', MonRef, _Type, _Object, _Info}, #state{dict = Dict} = State) ->
+    L = lists:filter(
+        fun({{consumer, _Tag}, {_Pid, Ref}}) -> 
+            Ref == MonRef;
+           ({_K, _V}) ->
+            false
+    end, dict:to_list(Dict)),
+    NewDict = lists:foldl(fun({{consumer, Tag}, _Val}, Acc) -> 
+        basic_cancel(Tag, State), 
+        dict:erase({consumer, Tag}, Acc)
+    end, Dict, L),
+    {noreply, State#state{dict = NewDict}};
 
 handle_info(Info, State) ->
-    ?WARNING("unexpected info: ~p", [Info]),
+    ?ERROR("badinfo: ~p", [Info]),
     {noreply, State}.
 
 %%--------------------------------------------------------------------
@@ -502,9 +551,6 @@ handle_info(Info, State) ->
 %%--------------------------------------------------------------------
 terminate(_Reason, #state{connection = Conn} = _State) ->
     amqp_connection:close(Conn),
-    ets:delete(queue),
-    ets:delete(exchange),
-    ets:delete(consumer),
     ok.
 
 %%--------------------------------------------------------------------
@@ -517,8 +563,9 @@ code_change(_OldVsn, State, _Extra) ->
 %%--------------------------------------------------------------------
 %%% Internal functions
 %%--------------------------------------------------------------------
-call(Req) ->
-    gen_server:call(?MODULE, Req).
+store(Key, Val, #state{dict = Dict} = State) ->
+    Dict1 = dict:store(Key, Val, Dict),
+    State#state{dict = Dict1}.
 
 declare_queue( #state{channel = Channel, ticket = Ticket}  = _State) ->
     QueueDeclare = #'queue.declare'{ticket = Ticket, auto_delete = true},
@@ -658,4 +705,3 @@ basic_properties() ->
   #'P_basic'{content_type = <<"application/octet-stream">>,
              delivery_mode = 1,
              priority = 1}.
-  
