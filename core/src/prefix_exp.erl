@@ -4,7 +4,7 @@
 
 -import(lists, [foldl/3, keysearch/3]).
 
--export([scan/1, parse/1, valid/1, eval/2]).
+-export([is_digital/1, scan/1, parse/1, valid/1, eval/2]).
 
 %%string -> tokens
 scan(S) ->
@@ -29,6 +29,9 @@ scan([$& | S], [], Result) ->
 
 scan([$| | S], [], Result) ->
     scan(S, [], ['|' | Result]);
+
+scan([$!, $= | S], [], Result) ->
+    scan(S, [], ['!=' | Result]);
 
 scan([$! | S], [], Result) ->
     scan(S, [], ['!' | Result]);
@@ -85,7 +88,20 @@ parse1(['<', L, R]) ->
     {'<', list_to_atom(L), list_to_integer(R)};
 
 parse1(['=', L, R]) ->
-    {'=', list_to_atom(L), list_to_integer(R)};
+    case is_digital(R) of
+    true ->
+        {'=', list_to_atom(L), list_to_integer(R)};
+    false ->
+        {'=', list_to_atom(L), R}
+    end;
+
+parse1(['!=', L, R]) ->
+    case is_digital(R) of
+    true ->
+        {'!=', list_to_atom(L), list_to_integer(R)};
+    false ->
+        {'!=', list_to_atom(L), R}
+    end;
 
 parse1(['>=', L, R]) ->
     {'>=', list_to_atom(L), list_to_integer(R)};
@@ -143,6 +159,9 @@ valid({'>', Name, _Val}) when is_atom(Name) ->
 valid({'<', Name, _Val}) when is_atom(Name) ->
     ok;
 
+valid({'!=', Name, _Val}) when is_atom(Name) ->
+    ok;
+
 valid({'=', Name, _Val}) when is_atom(Name) ->
     ok;
 
@@ -172,6 +191,10 @@ eval({'<', Name, Val}, Args) ->
     {value, {_, ArgVal}} = keysearch(Name, 1, Args),
     ArgVal < Val;
 
+eval({'!=', Name, Val}, Args) ->
+    {value, {_, ArgVal}} = keysearch(Name, 1, Args),
+    not (ArgVal == Val);
+
 eval({'=', Name, Val}, Args) ->
     {value, {_, ArgVal}} = keysearch(Name, 1, Args),
     ArgVal == Val;
@@ -199,5 +222,21 @@ eval_and([SubExp|T], Args) ->
     true -> eval_and(T, Args);
     false -> false 
     end.
-    
+
+is_digital([]) ->
+    false;
+
+is_digital(L) ->
+    is_digital2(L).
+
+is_digital2([]) ->
+    true;
+
+is_digital2([H|T])  ->
+    if
+    (H >= $0) and (H =< $9) -> 
+        is_digital2(T);
+    true ->
+        false
+    end.
 

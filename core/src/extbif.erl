@@ -9,13 +9,17 @@
 %%%----------------------------------------------------------------------
 -module(extbif).
 
--export([timestamp/0, 
+-export([datetime/0,
+        timestamp/0, 
         to_list/1, 
         to_binary/1, 
         binary_to_atom/1, 
         atom_to_binary/1,
         binary_split/2,
         to_integer/1]).
+
+datetime() ->
+    calendar:local_time().
 
 timestamp() ->
 	{MegaSecs, Secs, _MicroSecs} = erlang:now(),
@@ -36,10 +40,12 @@ to_list(L) when is_float(L) ->
 to_list(B) when is_binary(B) ->
     binary_to_list(B).
 
+to_binary(A) when is_atom(A) ->
+    list_to_binary(atom_to_list(A));
 to_binary(B) when is_binary(B) ->
     B;
-to_binary(B) when is_integer(B) ->
-    B;
+to_binary(I) when is_integer(I) ->
+    list_to_binary(integer_to_list(I));
 to_binary(L) when is_list(L) ->
     list_to_binary(L).
 
