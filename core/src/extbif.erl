@@ -38,22 +38,20 @@ to_list(B) when is_binary(B) ->
 
 to_binary(B) when is_binary(B) ->
     B;
-to_binary(B) when is_integer(B) ->
-    B;
 to_binary(L) when is_list(L) ->
-    list_to_binary(L).
+    list_to_binary(L);
+to_binary(A) when is_atom(A) ->
+    list_to_binary(atom_to_list(A));
+to_binary(N) ->
+    N.
 
 to_integer(I) when is_integer(I) ->
     I;
 to_integer(I) when is_list(I) ->
     case string:str(I, ".") of
         0 ->
-           case string:to_integer(I) of
-               {error, _} ->
-                    0;
-               {Value0 ,_}  ->
-                    Value0
-           end;
+           {Value0 ,_} = string:to_integer(I),
+           Value0;
         _ ->
             {Value0 ,_} = string:to_float(I),
              Value0
