@@ -16,6 +16,8 @@
 
 -define(TIMEOUT, 10000).
 
+-define(MAX_LIMIT, 9999).
+
 %%Scalars = [{Name, Oid}]
 get_group(Addr, Scalars) ->
     get_group(Addr, Scalars, []).
@@ -61,7 +63,7 @@ get_table(Addr, Columns) ->
 get_table(Addr, Columns, AgentData) ->
     get_table(Addr, ?PORT, Columns, AgentData, ?TIMEOUT).
 
-get_table(Addr, Port, Columns, AgentData) 
+get_table(Addr, Port, Columns, AgentData)
     when is_integer(Port) and is_list(Columns) ->
     get_table(Addr, Port, Columns, AgentData, ?TIMEOUT);
 
@@ -71,7 +73,6 @@ get_table(Addr, Columns, AgentData, Timeout)
 
 get_table(Addr, Port, Columns, AgentData, TIMEOUT) ->
 	[{_, Col1Oid} | _] = Columns,
-    ?INFO("Columns :~p",[Columns]),
 	case get_table(Addr, Port, formatoid(Col1Oid), Columns, AgentData, TIMEOUT, []) of
 	{ok, Rows} ->
 		{ok, lists:reverse(Rows)};
@@ -80,23 +81,29 @@ get_table(Addr, Port, Columns, AgentData, TIMEOUT) ->
 	end.
 
 get_table(Addr, Port, Col1Oid, Columns, AgentData, TIMEOUT, Acc) ->
-	{Names, Oids} = split_vars(Columns),
-	case retry(fun() -> sesnmp_client:get_next(Addr, Port, Oids, AgentData, TIMEOUT) end, ?RETRIES) of
-	{ok, {noError, 0, Varbinds}, _} -> 
-		#varbind{oid=Oid} = lists:nth(1, Varbinds),
-		case start_with_oid(Col1Oid, Oid) of
-		true ->
-			NewOids = lists:map(fun(Varbind) -> Varbind#varbind.oid end, Varbinds),
-			NewColumns = to_name_oid_map(Names, NewOids),
-			get_table(Addr, Port, Col1Oid, NewColumns, AgentData, TIMEOUT, [ [{tableIndex, Oid -- Col1Oid} | merge_vars(Names, Varbinds)] | Acc]);
-		false ->
-			{ok, Acc}
-		end;
-    {ok, Error, _} ->
-        {error, Error};
-	Error -> 
-		{error, Error}
-	end.
+    {value, Limit} = dataset:get_value(limit, AgentData, ?MAX_LIMIT),
+    case length(Acc) > Limit of
+    true ->
+        {ok, Acc};
+    false ->
+        {Names, Oids} = split_vars(Columns),
+        case retry(fun() -> sesnmp_client:get_next(Addr, Port, Oids, AgentData, TIMEOUT) end, ?RETRIES) of
+        {ok, {noError, 0, Varbinds}, _} -> 
+            #varbind{oid=Oid} = lists:nth(1, Varbinds),
+            case start_with_oid(Col1Oid, Oid) of
+            true ->
+                NewOids = lists:map(fun(Varbind) -> Varbind#varbind.oid end, Varbinds),
+                NewColumns = to_name_oid_map(Names, NewOids),
+                get_table(Addr, Port, Col1Oid, NewColumns, AgentData, TIMEOUT, [ [{tableIndex, Oid -- Col1Oid} | merge_vars(Names, Varbinds)] | Acc]);
+            false ->
+                {ok, Acc}
+            end;
+        {ok, Error, _} ->
+            {error, Error};
+        Error -> 
+            {error, Error}
+        end
+    end.
 
 get_entry(Addr, Columns, Indices) ->
     get_entry(Addr, Columns, Indices, []). 
