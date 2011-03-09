@@ -34,7 +34,7 @@ get_group(Addr, Port, Scalars, AgentData) ->
 get_group(Addr, Port, Scalars, AgentData, Timeout) ->
 	{Names, Oids} = split_vars(Scalars),
 	case retry(fun() -> sesnmp_client:get(Addr, Port, Oids, AgentData, Timeout) end, ?RETRIES) of
-	{ok, {noError, 0, Varbinds}, _} -> 
+	{ok, {noError, _, Varbinds}, _} -> 
 		{ok, merge_vars(Names, Varbinds)};
     {ok, Error, _} ->
         {error, Error};
