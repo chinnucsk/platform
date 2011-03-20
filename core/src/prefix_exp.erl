@@ -1,6 +1,6 @@
 -module(prefix_exp).
 
--import(extbif, [to_list/1]).
+-import(extbif, [to_list/1, to_integer/1]).
 
 -import(lists, [foldl/3, keysearch/3]).
 
@@ -82,15 +82,15 @@ parse1(['!' | T]) ->
     {'!', parse1(T)};
 
 parse1(['>', L, R]) ->
-    {'>', list_to_atom(L), list_to_integer(R)};
+    {'>', list_to_atom(L), to_integer(R)};
 
 parse1(['<', L, R]) ->
-    {'<', list_to_atom(L), list_to_integer(R)};
+    {'<', list_to_atom(L), to_integer(R)};
 
 parse1(['=', L, R]) ->
     case is_digital(R) of
     true ->
-        {'=', list_to_atom(L), list_to_integer(R)};
+        {'=', list_to_atom(L), to_integer(R)};
     false ->
         {'=', list_to_atom(L), R}
     end;
@@ -98,16 +98,16 @@ parse1(['=', L, R]) ->
 parse1(['!=', L, R]) ->
     case is_digital(R) of
     true ->
-        {'!=', list_to_atom(L), list_to_integer(R)};
+        {'!=', list_to_atom(L), to_integer(R)};
     false ->
         {'!=', list_to_atom(L), R}
     end;
 
 parse1(['>=', L, R]) ->
-    {'>=', list_to_atom(L), list_to_integer(R)};
+    {'>=', list_to_atom(L), to_integer(R)};
 
 parse1(['<=', L, R]) ->
-    {'<=', list_to_atom(L), list_to_integer(R)};
+    {'<=', list_to_atom(L), to_integer(R)};
 
 parse1(['(' | _] = Tokens) ->
     parse1(split(Tokens));
