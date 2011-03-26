@@ -11,6 +11,7 @@
 
 -export([datetime/0,
         timestamp/0, 
+        to_atom/1,
         to_list/1, 
         to_binary/1, 
         binary_to_atom/1, 
@@ -24,6 +25,13 @@ datetime() ->
 timestamp() ->
 	{MegaSecs, Secs, _MicroSecs} = erlang:now(),
 	MegaSecs * 1000000 + Secs.
+
+to_atom(L) when is_list(L) -> 
+    list_to_atom(L);
+to_atom(B) when is_binary(B) ->
+    to_atom(binary_to_list(B));
+to_atom(A) when is_atom(A) ->
+    A.
 
 to_list(L) when is_list(L) ->
     L;
