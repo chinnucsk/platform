@@ -18,25 +18,27 @@
 
 -export([start_link/1,
          start_link/2, 
+         start_link/4, 
          stop/0, 
          stop/1]).
 
 %%api 
--export([queue/1, queue/2, queue/3,
-         exchange/2, exchange/3, exchange/4,
-         direct/2, direct/3,
-         topic/2, topic/3,
-         fanout/2, fanout/3,
-         bind/3, bind/4, 
-         unbind/3,
-         send/3,
-         publish/3, publish/4, publish/5,
-         delete/3,
-         consume/2, consume/3, 
-         get/2,
-         ack/2, 
-         cancel/2 %,close/0
-         ]).
+-export([request/3, reply/4,
+        queue/1, queue/2, queue/3,
+        exchange/2, exchange/3, exchange/4,
+        direct/2, direct/3,
+        topic/2, topic/3,
+        fanout/2, fanout/3,
+        bind/3, bind/4, 
+        unbind/3,
+        send/3,
+        publish/3, publish/4, publish/5,
+        delete/3,
+        consume/2, consume/3, 
+        get/2,
+        ack/2, 
+        cancel/2 %,close/0
+        ]).
 
 %%callbacks
 -export([init/1, 
@@ -46,7 +48,9 @@
         terminate/2, 
         code_change/3]).
 
--record(state, {params, realm, connection, channel, ticket, dict}).
+-record(state, {params, realm, connection, channel, ticket, reply_queue, reply_consumer_tag, dict}).
+
+-define(RPC_TIMEOUT, 3000).
 
 %% @spec start_link(Opts) -> Result
 %%  Opts = [tuple()]
@@ -63,6 +67,16 @@ start_link(Opts) ->
 start_link(Name, Opts) ->
     gen_server:start_link({local, Name}, ?MODULE, [Opts], []).
 
+start_link(Name, Opts, Succ, Fail) ->
+    case start_link(Name, Opts) of
+    {ok, Pid} ->
+        Succ(Pid),
+        {ok, Pid};
+    {error, Error} ->
+        Fail(Error),
+        {ok, undefined}
+    end.
+
 %% @spec stop() -> ok
 %% @doc stop amqp client
 stop() ->
@@ -73,7 +87,21 @@ stop() ->
 %% @doc stop amqp client
 stop(Name) ->
     gen_server:call(Name, stop).
-    
+
+%% @spec request(Pid, To, Request) -> Result
+%%  Pid = pid() | atom()
+%%  To = iolist()
+%%  Request = term()
+%%  Result = {ok, Reply} | {error,Error}
+%%  Reply = term()
+%%  Error = term() 
+%% @doc rpc request
+request(Pid, To, Request) ->
+    call(Pid, {request, To, Request}).
+
+reply(Pid, To, Id, Reply) ->
+    call(Pid, {reply, To, Id, Reply}).
+
 %% @spec queue(Pid) -> Result
 %%  Pid = pid() | atom()
 %%  Result = {ok, Q, Props} | {error,Error}
@@ -361,6 +389,28 @@ connect(Params, Realm) ->
 %%                                      {stop, Reason, State}
 %% Description: Handling call messages
 %%--------------------------------------------------------------------
+handle_call({request, To, Req}, From, #state{reply_queue = RepQ} = State) ->
+    NewState =
+    case RepQ of
+    undefined ->
+        {ok, Q} = declare_queue(State),
+        {ok, ConsumeTag} = basic_consume(Q, State),
+        ?INFO("rpc ConsumerTag: ~p", [ConsumeTag]),
+        State#state{reply_queue = Q, reply_consumer_tag = ConsumeTag};
+    _ -> 
+        State
+    end,
+    %TODO: should monitor From.
+    ReqId = basic_request(To, term_to_binary(Req), NewState), 
+    Timer = erlang:send_after(?RPC_TIMEOUT, self(), {rpc_timeout, ReqId}),
+    put(ReqId, {From, Timer}),
+    {noreply, NewState};
+
+handle_call({reply, To, ReqId, Req}, _From, State) ->
+    Payload = term_to_binary(Req),
+    basic_reply(To, ReqId, Payload, State),
+    {reply, ok, State};
+
 handle_call(queue, _From, State) ->
     {ok, Q} = declare_queue(State),
     {reply, {ok, Q}, store({queue, Q}, true, State)};
@@ -506,20 +556,34 @@ handle_cast(Msg, State) ->
 %%                                       {stop, Reason, State}
 %% Description: Handling all non call/cast messages
 %%--------------------------------------------------------------------
-handle_info({#'basic.deliver'{consumer_tag=ConsumerTag, 
-    delivery_tag=_DeliveryTag, 
-    redelivered=_Redelivered, 
-    exchange=_Exchange, 
-    routing_key=RoutingKey}, #amqp_msg{props = Properties, payload = Payload} = _Msg}, 
+handle_info({#'basic.deliver'{consumer_tag = ConsumerTag,
+    delivery_tag = _DeliveryTag, 
+    redelivered = _Redelivered,
+    exchange = _Exchange,
+    routing_key = _RoutingKey}, #amqp_msg{props = Properties, payload = Payload} = _Msg},
+    #state{reply_consumer_tag = ConsumerTag} = State) ->
+    ?INFO("amqp reply got", []),
+    #'P_basic'{content_type = _ContentType, correlation_id = ReqId} = Properties,
+    case get(ReqId) of
+    {From, Timer} ->
+        cancel_timer(Timer),
+        gen_server:reply(From, binary_to_term(Payload));
+    undefined ->
+        ?ERROR("unexpected rpc reply: ~p", [binary_to_term(Payload)])    
+    end,
+    {noreply, State};
+
+handle_info({#'basic.deliver'{consumer_tag = ConsumerTag,
+    delivery_tag = _DeliveryTag, 
+    redelivered = _Redelivered, 
+    exchange = _Exchange, 
+    routing_key = RoutingKey}, #amqp_msg{props = Properties, payload = Payload} = _Msg}, 
     #state{dict = Dict} = State) ->
-    #'P_basic'{content_type = ContentType} = Properties,
-    %?INFO("delivery got!"
-    %        "~n from exchange: ~p" 
-    %        "~n routing key: ~p"
-    %        "~n content type: ~p", [Exchange, RoutingKey, ContentType]),
+    #'P_basic'{content_type = ContentType, correlation_id = CorrelationId, reply_to = ReplyTo} = Properties,
     case dict:find({consumer, ConsumerTag}, Dict) of
     {ok, {Consumer, _Ref}} ->
-        Consumer ! {deliver, RoutingKey, [{content_type, ContentType}], Payload};
+        Consumer ! {deliver, RoutingKey, [{content_type, ContentType}, 
+            {correlation_id, CorrelationId}, {reply_to, ReplyTo}], Payload};
     error -> 
         ?ERROR("no available consumer for: ~p", [ConsumerTag])
     end,
@@ -537,6 +601,17 @@ handle_info({'DOWN', MonRef, _Type, _Object, _Info}, #state{dict = Dict} = State
         dict:erase({consumer, Tag}, Acc)
     end, Dict, L),
     {noreply, State#state{dict = NewDict}};
+
+handle_info({rpc_timeout, ReqId}, State) ->
+    case get(ReqId) of
+    {From, Timer} ->
+        cancel_timer(Timer),
+        gen_server:reply(From, {error, rpc_timeout}),
+        erase(ReqId);
+    undefined -> 
+        ?ERROR("cannot find timeout req: ~p", [ReqId])
+    end,
+    {noreply, State};
 
 handle_info(Info, State) ->
     ?ERROR("badinfo: ~p", [Info]),
@@ -618,6 +693,38 @@ unbind_queue(Exchange, Queue, RoutingKey, #state{channel = Channel, ticket = Tic
                               routing_key = RoutingKey,
                               arguments = []},
     #'queue.unbind_ok'{} = amqp_channel:call(Channel, QueueUnbind).
+
+basic_request(ReqQ, Payload, #state{channel = Channel, ticket = Ticket, 
+    reply_queue = RepQ} = _State) ->
+    K = binary(ReqQ),
+    BasicPublish = #'basic.publish'{ticket = Ticket,
+                                    %exchange = X,
+                                    routing_key = K,
+                                    mandatory = false,
+                                    immediate = false},
+    CorrelationId = uuid:v4(),
+    Props = #'P_basic'{content_type = <<"application/octet-stream">>,
+                 delivery_mode = 1,
+                 priority = 3,
+                 correlation_id = CorrelationId,
+                 reply_to = RepQ},
+    Msg = #amqp_msg{props = Props, payload = Payload},
+    amqp_channel:cast(Channel, BasicPublish, Msg),
+    CorrelationId.
+
+basic_reply(ReqQ, ReqId, Payload, #state{channel = Channel, ticket = Ticket} = _State) ->
+    K = binary(ReqQ),
+    BasicPublish = #'basic.publish'{ticket = Ticket,
+                                    %exchange = X,
+                                    routing_key = K,
+                                    mandatory = false,
+                                    immediate = true},
+    Props = #'P_basic'{content_type = <<"application/octet-stream">>,
+                 delivery_mode = 1,
+                 priority = 3,
+                 correlation_id = ReqId},
+    Msg = #amqp_msg{props = Props, payload = Payload},
+    amqp_channel:cast(Channel, BasicPublish, Msg).
 
 basic_send(Queue, Payload0, #state{channel = Channel, ticket = Ticket} = _State) ->
     K = binary(Queue),
@@ -705,3 +812,6 @@ basic_properties() ->
   #'P_basic'{content_type = <<"application/octet-stream">>,
              delivery_mode = 1,
              priority = 1}.
+
+cancel_timer(undefined) -> ok;
+cancel_timer(Timer) -> erlang:cancel_timer(Timer).
