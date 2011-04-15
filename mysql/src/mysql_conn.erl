@@ -53,9 +53,9 @@
 
 -define(MYSQL_QUERY_OP, 3).
 
--define(CALL_TIMEOUT, 12000).
+-define(CALL_TIMEOUT, 15000).
 
--define(CONNECT_TIMEOUT, 10000).
+-define(CONNECT_TIMEOUT, 12000).
 
 -define(MYSQL_4_0, 40). %% Support for MySQL 4.0.x
 
