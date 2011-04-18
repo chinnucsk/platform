@@ -69,7 +69,7 @@ update(Tab, Record) ->
 	case dataset:get_value(id, Record) of 
     {value, Id} ->
         update(Tab, dataset:key_delete(id, Record), {id, Id});
-    false ->
+    {false, _} ->
         {error, no_id_found}
 	end.
 
