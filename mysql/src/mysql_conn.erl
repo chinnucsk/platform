@@ -636,9 +636,12 @@ normalize_version([$4,$.,$1|_T]) ->
 normalize_version([$5|_T]) ->
     %% MySQL version 5.x protocol is compliant with MySQL 4.1.x:
     ?MYSQL_4_1; 
-normalize_version(_Other) ->
-    ?ERROR("MySQL version not supported: MySQL Erlang module "
-	 "might not work correctly.", []),
+normalize_version([$6|_T]) ->
+    %% MySQL version 6.x protocol is compliant with MySQL 4.1.x:
+    ?MYSQL_4_1; 
+normalize_version(Other) ->
+    ?ERROR("MySQL version '~p' not supported: MySQL Erlang module "
+	 "might not work correctly.", [Other]),
     %% Error, but trying the oldest protocol anyway:
     ?MYSQL_4_0.
 
