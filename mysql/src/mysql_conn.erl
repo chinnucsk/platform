@@ -53,9 +53,10 @@
 
 -define(MYSQL_QUERY_OP, 3).
 
--define(CALL_TIMEOUT, 15000).
+%CALL > CONNECT
+-define(CALL_TIMEOUT, 30000).
 
--define(CONNECT_TIMEOUT, 12000).
+-define(CONNECT_TIMEOUT, 30000).
 
 -define(MYSQL_4_0, 40). %% Support for MySQL 4.0.x
 
@@ -165,7 +166,8 @@ init([Opts]) ->
                 ?PRINT("~nmysql connection is starting...[done]~n", []),
 			    {ok, State}
             end;
-		{error, _Reason} ->
+		{error, Reason} ->
+            ?ERROR("mysql_conn init error: ~p", [Reason]),
             {stop, login_failed}
         end;
 	_E ->
@@ -423,8 +425,8 @@ get_query_response(RecvPid, Version) ->
 	    case Fieldcount of
 		0 ->
 		    %% No Tabular data
-		    <<AffectedRows:8, _Rest2/binary>> = Rest,
-		    {updated, #mysql_result{affectedrows=AffectedRows}};
+		    <<AffectedRows:8, InsertId:8, _Rest2/binary>> = Rest,
+		    {updated, #mysql_result{insert_id = InsertId, affectedrows=AffectedRows}};
 		255 ->
 		    <<_Code:16/little, Message/binary>>  = Rest,
 		    {error, #mysql_result{error=Message}};

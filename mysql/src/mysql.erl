@@ -119,8 +119,8 @@ unprepare(Name) ->
     mysql_conn:unprepare(Name).
 
 %% Convert MySQL query result to Erlang ODBC result formalism
-mysql_to_odbc({updated, #mysql_result{affectedrows=AffectedRows} = _MySQLRes}) ->
-    {updated, AffectedRows};
+mysql_to_odbc({updated, #mysql_result{affectedrows=AffectedRows, insert_id = InsertId} = _MySQLRes}) ->
+    {updated, {AffectedRows, InsertId}};
 
 mysql_to_odbc({data, #mysql_result{fieldinfo = FieldInfo, rows=AllRows} = _MySQLRes}) ->
     mysql_item_to_odbc(FieldInfo, AllRows);
