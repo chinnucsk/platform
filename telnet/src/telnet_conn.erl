@@ -19,6 +19,10 @@
 -define(CONN_TIMEOUT, 10000).
 -define(CALL_TIMEOUT, 12000).
 
+-define(username,"login: ").
+-define(password,"Password: ").
+-define(prx,"login: |Password: |\\\$ |> ").
+
 -record(state, {
 	  host,
 	  port,
