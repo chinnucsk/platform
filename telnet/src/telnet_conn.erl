@@ -4,7 +4,8 @@
 
 -behaviour(gen_server).
 
--export([send_data/1, send_data/2, get_data/1]).
+-export([start_link/1,
+        send_data/1, send_data/2]).
 
 %% Callback
 -export([init/1,
@@ -44,6 +45,7 @@ send_data(Cmd, Timeout)  ->
 
 
 init([Opts]) ->
+    io:format("starting telnet conn ...~p",[Opts]),
     Host = proplists:get_value(host, Opts, "localhost"),
     Port = proplists:get_value(port, Opts, 23),
     Username = proplists:get_value(username, Opts, "root"),

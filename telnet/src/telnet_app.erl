@@ -12,6 +12,7 @@ start() ->
 	application:start(telnet).
 
 start(normal, _Args) ->
+    io:format("starting telnet app ..."),
 	telnet_sup:start_link(application:get_all_env()).
 
 stop(_) ->
