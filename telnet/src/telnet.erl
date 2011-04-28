@@ -59,7 +59,7 @@
 %%%
 %%% @see unix_telnet
 
--module(ct_telnet).
+-module(telnet).
 
 -compile(export_all).
 
@@ -81,7 +81,7 @@
 -define(DEFAULT_TIMEOUT,10000).
 -define(DEFAULT_PORT,23).
 
--include("ct_util.hrl").
+-include("telnet_util.hrl").
 
 -record(state,{teln_pid,
 	       prx,
@@ -111,7 +111,7 @@ open(Name) ->
 %%%
 %%% @doc Open a telnet connection to the specified target host.
 open(Name,ConnType) ->
-    case ct_util:get_key_from_name(Name) of
+    case telnet_util:get_key_from_name(Name) of
 	{ok, unix} -> % unix host
 	    open(Name, ConnType, unix_telnet, Name);
 	{ok, Key} -> % any other, e.g. interwatch (iw), etc.
@@ -670,7 +670,7 @@ try_cont_log(Str,Args) ->
 %%% @hidden
 do_try_log(Func,Args) ->
     %% check if output is suppressed
-    case ct_util:is_silenced(telnet) of
+    case telnet_util:is_silenced(telnet) of
 	true ->
 	    ok;
 	false ->

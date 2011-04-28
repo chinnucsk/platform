@@ -61,8 +61,8 @@
 
 -export([warn_duplicates/1]).
 
--include("ct_event.hrl").
--include("ct_util.hrl").
+-include("telnet_event.hrl").
+-include("telnet_util.hrl").
 
 -record(suite_data, {key,name,value}).
 

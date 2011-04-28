@@ -4,7 +4,7 @@
 
 -behaviour(gen_server).
 
--export([start_link/1,
+-export([start_link/1, start/1,
         get_data/2, get_data/3,
         send_data/2,
         stop/1]).
@@ -38,8 +38,14 @@
 	 }).
      
 
-start_link(Opts) ->
-    gen_server:start_link(?MODULE, [Opts], []).
+%%%%%%%%%%%%%%%%%%% extra interface %%%%%%%%%%%%%%%%%
+start(Opts) ->
+    case start_link(Opts) of
+    {ok, Pid} ->
+        {ok, Pid};
+    {error, _Error} ->
+        {ok, undefined}
+    end.
 
 get_data(Pid, Cmd) ->
     get_data(Pid, Cmd, ?CALL_TIMEOUT).
@@ -52,6 +58,11 @@ send_data(Pid, Cmd) ->
 
 stop(Pid) ->
     gen_server:call(Pid, stop).
+
+
+
+start_link(Opts) ->
+    gen_server:start_link(?MODULE, [Opts], []).
 
 
 init([Opts]) ->
@@ -71,19 +82,19 @@ init([Opts]) ->
 
 connect(Ip,Port,Timeout,KeepAlive,Username,Password) ->
     ?INFO("telnet:connect",[]),
-    Result =case ct_telnet_client:open(Ip,Port,Timeout,KeepAlive) of
+    Result =case telnet_client:open(Ip,Port,Timeout,KeepAlive) of
                 {ok,Pid} ->
-                    case ct_telnet:silent_teln_expect(Pid,[],[prompt],?prx,[]) of
+                    case telnet:silent_teln_expect(Pid,[],[prompt],?prx,[]) of
                         {ok,{prompt,?username},_} ->
-                        ok = ct_telnet_client:send_data(Pid,Username),
+                        ok = telnet_client:send_data(Pid,Username),
                         ?INFO("Username: ~s",[Username]),
-                        case ct_telnet:silent_teln_expect(Pid,[],prompt,?prx,[]) of
+                        case telnet:silent_teln_expect(Pid,[],prompt,?prx,[]) of
                             {ok,{prompt,?password},_} ->
-                            ok = ct_telnet_client:send_data(Pid,Password),
+                            ok = telnet_client:send_data(Pid,Password),
                             Stars = lists:duplicate(length(Password),$*),
                             ?INFO("Password: ~s",[Stars]),
-                            ok = ct_telnet_client:send_data(Pid,""),
-                            case ct_telnet:silent_teln_expect(Pid,[],prompt,
+                            ok = telnet_client:send_data(Pid,""),
+                            case telnet:silent_teln_expect(Pid,[],prompt,
                                               ?prx,[]) of
                                 {ok,{prompt,Prompt},_}
                                 when Prompt=/=?username, Prompt=/=?password ->
@@ -116,8 +127,8 @@ handle_call(stop, _From, State) ->
 
 handle_call({cmd, Cmd}, From, #state{conn_state = connected, socket = Socket} = State) ->
     ?INFO("handle_call,from:~p, Cmd,~p", [From, Cmd]),
-    ct_telnet_client:send_data(Socket, Cmd),
-    Resp = ct_telnet_client:get_data(Socket),
+    telnet_client:send_data(Socket, Cmd),
+    Resp = telnet_client:get_data(Socket),
     ?INFO("respond :~p",[Resp]),
     {reply, Resp, State};
 
@@ -131,7 +142,7 @@ handle_call(Req, _From, State) ->
 
 handle_cast({cmd, Cmd}, #state{conn_state = connected, socket = Socket} = State) ->
     ?INFO("handle_cast, Cmd,~p", [Cmd]),
-    ct_telnet_client:send_data(Socket, Cmd),
+    telnet_client:send_data(Socket, Cmd),
     {noreply, State};
 
 handle_cast(Req, State) ->
