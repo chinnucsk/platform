@@ -25,6 +25,8 @@
 -define(password,"Password: ").
 -define(prx,"login: |Password: |\\\$ |> ").
 
+-define(keepalive, true).
+
 -record(state, {
 	  host,
 	  port,
@@ -57,7 +59,7 @@ init([Opts]) ->
     Port = proplists:get_value(port, Opts, 23),
     Username = proplists:get_value(username, Opts, "root"),
     Password = proplists:get_value(password, Opts, "public"),
-    case (catch connect(Host, Port, ?CONN_TIMEOUT, true, Username, Password)) of
+    case (catch connect(Host, Port, ?CONN_TIMEOUT, ?keepalive, Username, Password)) of
 	{ok, Pid} ->
 	    {ok, #state{host = Host, port = Port, socket = Pid, user = Username, password = Password, conn_state = connected}};
 	{error, Error} ->
@@ -70,38 +72,16 @@ connect(Ip,Port,Timeout,KeepAlive,Username,Password) ->
     ?INFO("telnet:connect",[]),
     Result =case ct_telnet_client:open(Ip,Port,Timeout,KeepAlive) of
                 {ok,Pid} ->
-                case ct_telnet:silent_teln_expect(Pid,[],[prompt],?prx,[]) of
-                    {ok,{prompt,?username},_} ->
                     ok = ct_telnet_client:send_data(Pid,Username),
                     ?INFO("Username: ~s",[Username]),
-                    case ct_telnet:silent_teln_expect(Pid,[],prompt,?prx,[]) of
-                        {ok,{prompt,?password},_} ->
-                        ok = ct_telnet_client:send_data(Pid,Password),
-                        Stars = lists:duplicate(length(Password),$*),
-                        ?INFO("Password: ~s",[Stars]),
-                        ok = ct_telnet_client:send_data(Pid,""),
-                        case ct_telnet:silent_teln_expect(Pid,[],prompt,?prx,[]) of
-                            {ok,{prompt,Prompt},_}
-                                    when Prompt=/=?username, Prompt=/=?password ->
-                                {ok,Pid};
-                            Error ->
-                                ?INFO("Password failed\n~p\n",
-                                     [Error]),
-                                {error,Error}
-                        end;
-                        Error ->
-                        ?WARNING("Login failed\n~p\n",[Error]),
-                        {error,Error}
-                    end;
-                    {ok,[{prompt,_OtherPrompt1},{prompt,_OtherPrompt2}],_} ->
-                    {ok,Pid};
-                    Error ->
-                    ?WARNING("Did not get expected prompt\n~p\n",[Error]),
-                    {error,Error}
-                end;
+                    ok = ct_telnet_client:send_data(Pid,Password),
+                    Stars = lists:duplicate(length(Password),$*),
+                    ?INFO("Password: ~s",[Stars]),
+                    ok = ct_telnet_client:send_data(Pid,""),
+                            {ok,Pid};
                 Error ->
-                ?WARNING("Could not open telnet connection\n~p\n",[Error]),
-                Error
+                    ?WARNING("Could not open telnet connection\n~p\n",[Error]),
+                            Error
 	end,
     Result.
 
@@ -128,7 +108,7 @@ handle_call(Req, _From, State) ->
 handle_cast({cmd, Cmd}, #state{conn_state = connected, socket = Socket} = State) ->
     ?INFO("handle_cast, Cmd,~p", [Cmd]),
     ct_telnet_client:send_data(Socket, Cmd),
-    {noreply, State}.
+    {noreply, State};
 
 handle_cast(Req, State) ->
     ?WARNING("unexpected cast: ~n~p, state:~p", [Req, State]),
