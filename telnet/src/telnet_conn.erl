@@ -47,10 +47,7 @@ get_data(Pid, Cmd, Timeout)  ->
     gen_server:call(Pid, {cmd, Cmd}, Timeout).
 
 send_data(Pid, Cmd) ->
-    send_data(Pid, Cmd, ?CALL_TIMEOUT).
-
-send_data(Pid, Cmd, Timeout)  ->
-    gen_server:cast(Pid, {cmd, Cmd}, Timeout).
+    gen_server:cast(Pid, {cmd, Cmd}).
 
 
 init([Opts]) ->

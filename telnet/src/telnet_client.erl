@@ -16,7 +16,7 @@ start(Opts) ->
     case telnet_conn:start_link(Opts) of
     {ok, Pid} ->
         {ok, Pid};
-    {stop, _Error} ->
+    {error, _Error} ->
         {ok, undefined}
     end.
 
