@@ -53,8 +53,8 @@ init([Opts]) ->
     case (catch connect(Host, Port, ?CONN_TIMEOUT, true, Username, Password)) of
 	{ok, Pid} ->
 	    {ok, #state{host = Host, port = Port, socket = Pid, user = Username, password = Password, conn_state = connected}};
-	{error, Reason} ->
-	    {stop, Reason};
+	{error, Error} ->
+	    {stop, Error};
     {'EXIT', Reason} ->
         {stop, Reason}
 	end.
