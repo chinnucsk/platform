@@ -2,11 +2,14 @@
 
 -author("hejin-2011-4-27").
 
--export([send_cmd/1,
-        start/4, stop/1]).
+-export([send_cmd/2, get_data/2,
+        start/1, stop/1]).
 
-send_cmd(Cmd) ->
-    telnet_conn:send_data(Cmd).
+send_cmd(Pid, Cmd) ->
+    telnet_conn:send_data(Pid, Cmd).
+
+get_data(Pid, Cmd) ->
+    telnet_conn:get_data(Pid, Cmd).
 
 
 start(Opts) ->

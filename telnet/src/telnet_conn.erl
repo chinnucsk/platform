@@ -5,7 +5,8 @@
 -behaviour(gen_server).
 
 -export([start_link/1,
-        send_data/1, send_data/2]).
+        get_data/2, get_data/3,
+        send_data/2, send_data/3]).
 
 %% Callback
 -export([init/1,
@@ -37,11 +38,17 @@
 start_link(Opts) ->
     gen_server:start_link(?MODULE, [Opts], []).
 
-send_data(Cmd) ->
-    send_data(Cmd, ?CALL_TIMEOUT).
+get_data(Pid, Cmd) ->
+    get_data(Pid, Cmd, ?CALL_TIMEOUT).
 
-send_data(Cmd, Timeout)  ->
-    gen_server:call(?MODULE, {cmd, Cmd}, Timeout).
+get_data(Pid, Cmd, Timeout)  ->
+    gen_server:call(Pid, {cmd, Cmd}, Timeout).
+
+send_data(Pid, Cmd) ->
+    send_data(Pid, Cmd, ?CALL_TIMEOUT).
+
+send_data(Pid, Cmd, Timeout)  ->
+    gen_server:cast(Pid, {cmd, Cmd}, Timeout).
 
 
 init([Opts]) ->
@@ -118,8 +125,13 @@ handle_call(Req, _From, State) ->
     {reply, {error, {invalid_request, Req}}, State}.
 
 
-handle_cast(Msg, State) ->
-    ?WARNING("unexpected message: ~n~p", [Msg]),
+handle_cast({cmd, Cmd}, #state{conn_state = connected, socket = Socket} = State) ->
+    ?INFO("handle_cast, Cmd,~p", [Cmd]),
+    ct_telnet_client:send_data(Socket, Cmd),
+    {noreply, State}.
+
+handle_cast(Req, State) ->
+    ?WARNING("unexpected cast: ~n~p, state:~p", [Req, State]),
     {noreply, State}.
 
 handle_info(Info, State) ->
