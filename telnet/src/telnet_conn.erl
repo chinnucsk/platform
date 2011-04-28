@@ -6,7 +6,8 @@
 
 -export([start_link/1,
         get_data/2, get_data/3,
-        send_data/2, send_data/3]).
+        send_data/2,
+        stop/1]).
 
 %% Callback
 -export([init/1,
@@ -49,6 +50,9 @@ get_data(Pid, Cmd, Timeout)  ->
 send_data(Pid, Cmd) ->
     gen_server:cast(Pid, {cmd, Cmd}).
 
+stop(Pid) ->
+    gen_server:call(Pid, stop).
+
 
 init([Opts]) ->
     io:format("starting telnet conn ...~p",[Opts]),
@@ -69,13 +73,36 @@ connect(Ip,Port,Timeout,KeepAlive,Username,Password) ->
     ?INFO("telnet:connect",[]),
     Result =case ct_telnet_client:open(Ip,Port,Timeout,KeepAlive) of
                 {ok,Pid} ->
-                    ok = ct_telnet_client:send_data(Pid,Username),
-                    ?INFO("Username: ~s",[Username]),
-                    ok = ct_telnet_client:send_data(Pid,Password),
-                    Stars = lists:duplicate(length(Password),$*),
-                    ?INFO("Password: ~s",[Stars]),
-                    ok = ct_telnet_client:send_data(Pid,""),
-                            {ok,Pid};
+                    case ct_telnet:silent_teln_expect(Pid,[],[prompt],?prx,[]) of
+                        {ok,{prompt,?username},_} ->
+                        ok = ct_telnet_client:send_data(Pid,Username),
+                        ?INFO("Username: ~s",[Username]),
+                        case ct_telnet:silent_teln_expect(Pid,[],prompt,?prx,[]) of
+                            {ok,{prompt,?password},_} ->
+                            ok = ct_telnet_client:send_data(Pid,Password),
+                            Stars = lists:duplicate(length(Password),$*),
+                            ?INFO("Password: ~s",[Stars]),
+                            ok = ct_telnet_client:send_data(Pid,""),
+                            case ct_telnet:silent_teln_expect(Pid,[],prompt,
+                                              ?prx,[]) of
+                                {ok,{prompt,Prompt},_}
+                                when Prompt=/=?username, Prompt=/=?password ->
+                                {ok,Pid};
+                                Error ->
+                                ?WARNING("Password failed\n~p\n",
+                                     [Error]),
+                                {error,Error}
+                            end;
+                            Error ->
+                            ?WARNING("Login failed\n~p\n",[Error]),
+                            {error,Error}
+                        end;
+                        {ok,[{prompt,_OtherPrompt1},{prompt,_OtherPrompt2}],_} ->
+                        {ok,Pid};
+                        Error ->
+                        ?WARNING("Did not get expected prompt\n~p\n",[Error]),
+                        {error,Error}
+                    end;
                 Error ->
                     ?WARNING("Could not open telnet connection\n~p\n",[Error]),
                             Error
