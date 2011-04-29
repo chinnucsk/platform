@@ -23,7 +23,7 @@
 %%% implements the process ct_util_server which acts like a data
 %%% holder for suite, configuration and connection data.</p>
 %%%
--module(ct_util).
+-module(telnet_util).
 
 -export([start/0,start/1,start/2,stop/1,update_last_run_index/0]).
 
@@ -63,6 +63,8 @@
 
 -include("telnet_event.hrl").
 -include("telnet_util.hrl").
+
+-include("elog.hrl").
 
 -record(suite_data, {key,name,value}).
 
@@ -729,11 +731,16 @@ warn_duplicates(Suites) ->
 %%%-----------------------------------------------------------------
 %%% Internal functions
 call(Msg) ->
+    ?INFO("call msg:~p",[Msg]),
     MRef = erlang:monitor(process,whereis(ct_util_server)),
+    ?INFO("call MRef:~p",[MRef]),
     Ref = make_ref(),
+    ?INFO("call ref:~p",[Ref]),
     ct_util_server ! {Msg,{self(),Ref}},
+    ?INFO("send msg...",[]),
     receive
-	{Ref, Result} -> 
+	{Ref, Result} ->
+        ?INFO("recevice msg:~p",[Result]),
 	    erlang:demonitor(MRef, [flush]),
 	    Result;
 	{'DOWN',MRef,process,_,Reason}  -> 
