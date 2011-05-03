@@ -73,7 +73,8 @@
 %% Tool internals
 -export([silent_teln_expect/5, teln_receive_until_prompt/3,
 	 start_log/1, log/3, cont_log/2, end_log/0,
-	 try_start_log/1, try_log/3, try_cont_log/2, try_end_log/0]).
+	 try_start_log/1, try_log/3, %%try_cont_log/2,
+     try_end_log/0]).
 
 
 -define(RECONNS,3).
@@ -441,7 +442,7 @@ set_telnet_defaults([],S) ->
 %% @hidden
 handle_msg({cmd,Cmd,Timeout},State) ->
     try_start_log(heading(cmd,State#state.name)),
-    try_cont_log("Cmd: ~p", [Cmd]),
+    %%try_cont_log("Cmd: ~p", [Cmd]),
     debug_cont_log("Throwing Buffer:",[]),
     debug_log_lines(State#state.buffer),
     case {State#state.type,State#state.prompt} of
@@ -466,12 +467,12 @@ handle_msg({cmd,Cmd,Timeout},State) ->
     {Return,NewBuffer,Prompt} = 
 	case teln_cmd(State#state.teln_pid, Cmd, State#state.prx, TO) of
 	    {ok,Data,_PromptType,Rest} ->
-		try_cont_log("Return: ~p", [{ok,Data}]),
+		%%try_cont_log("Return: ~p", [{ok,Data}]),
 		{{ok,Data},Rest,true};
 	    Error ->
 		Retry = {retry,{Error,State#state.name,State#state.teln_pid,
 				{cmd,Cmd,TO}}},
-		try_cont_log("Return: ~p", [Error]),
+		%%try_cont_log("Return: ~p", [Error]),
 		{Retry,[],false}
 	end,
     try_end_log(),
@@ -504,12 +505,12 @@ handle_msg(get_data,State) ->
 					 State#state.prx,
 					 State#state.buffer,
 					 [],[]),
-    try_cont_log("Return: ~p",[{ok,Data}]),
+    %%try_cont_log("Return: ~p",[{ok,Data}]),
     try_end_log(),
     {{ok,Data},State#state{buffer=Buffer}};
 handle_msg({expect,Pattern,Opts},State) ->
     try_start_log(heading(expect,State#state.name)),
-    try_cont_log("Expect: ~p\nOpts=~p\n",[Pattern,Opts]),
+    %%try_cont_log("Expect: ~p\nOpts=~p\n",[Pattern,Opts]),
     {Return,NewBuffer,Prompt} = 
 	case teln_expect(State#state.teln_pid,
 			 State#state.buffer,
@@ -664,7 +665,7 @@ try_log(Heading,Str,Args) ->
     do_try_log(log,[Heading,Str,Args]).
 
 %%% @hidden
-try_cont_log(Str,Args) -> 
+try_cont_log(Str,Args) ->
     do_try_log(cont_log,[Str,Args]).
 
 %%% @hidden
@@ -735,9 +736,9 @@ teln_get_all_data(Pid,Prx,Data,Acc,LastLine) ->
 %% implements connect/2 and get_prompt_regexp/0.
 silent_teln_expect(Pid,Data,Pattern,Prx,Opts) ->
     Old = put(silent,true),
-    try_cont_log("silent_teln_expect/5, Pattern = ~p",[Pattern]),
+    %%try_cont_log("silent_teln_expect/5, Pattern = ~p",[Pattern]),
     Result = teln_expect(Pid,Data,Pattern,Prx,Opts),
-    try_cont_log("silent_teln_expect -> ~p\n",[Result]),
+    %%try_cont_log("silent_teln_expect -> ~p\n",[Result]),
     put(silent,Old),
     Result.
 
@@ -898,7 +899,7 @@ one_expect(Data,Pattern,EO) ->
 		[Prompt] when Prompt==prompt; Prompt=={prompt,PromptType} ->
 		    %% Only searching for prompt
 		    log_lines(UptoPrompt),
-		    try_cont_log("<b>PROMPT:</b> ~s", [PromptType]),
+		    %%try_cont_log("<b>PROMPT:</b> ~s", [PromptType]),
 		    {match,{prompt,PromptType},Rest};
 		[{prompt,_OtherPromptType}] ->
 		    %% Only searching for one specific prompt, not thisone
@@ -968,7 +969,7 @@ seq_expect1(Data,[prompt|Patterns],Acc,Rest,EO) ->
 	    {continue,[prompt|Patterns],Acc,LastLine};
 	PromptType ->
 	    log_lines(Data),
-	    try_cont_log("<b>PROMPT:</b> ~s", [PromptType]),
+	    %%try_cont_log("<b>PROMPT:</b> ~s", [PromptType]),
 	    seq_expect(Rest,Patterns,[{prompt,PromptType}|Acc],EO)
     end;
 seq_expect1(Data,[{prompt,PromptType}|Patterns],Acc,Rest,EO) ->
@@ -979,7 +980,7 @@ seq_expect1(Data,[{prompt,PromptType}|Patterns],Acc,Rest,EO) ->
 	    {continue,[{prompt,PromptType}|Patterns],Acc,LastLine};
 	PromptType ->
 	    log_lines(Data),
-	    try_cont_log("<b>PROMPT:</b> ~s", [PromptType]),
+	    %%try_cont_log("<b>PROMPT:</b> ~s", [PromptType]),
 	    seq_expect(Rest,Patterns,[{prompt,PromptType}|Acc],EO);
 	_OtherPromptType ->
 	    log_lines(Data),
@@ -1031,13 +1032,13 @@ match_line(Line,Patterns,FoundPrompt,EO) ->
 match_line(Line,[prompt|Patterns],false,EO,RetTag) ->
     match_line(Line,Patterns,false,EO,RetTag);
 match_line(Line,[prompt|_Patterns],FoundPrompt,_EO,RetTag) ->
-    try_cont_log("       ~s", [Line]),
-    try_cont_log("<b>PROMPT:</b> ~s", [FoundPrompt]),
+    %%try_cont_log("       ~s", [Line]),
+    %%try_cont_log("<b>PROMPT:</b> ~s", [FoundPrompt]),
     {RetTag,{prompt,FoundPrompt}};
 match_line(Line,[{prompt,PromptType}|_Patterns],FoundPrompt,_EO,RetTag) 
   when PromptType==FoundPrompt ->
-    try_cont_log("       ~s", [Line]),
-    try_cont_log("<b>PROMPT:</b> ~s", [FoundPrompt]),
+    %%try_cont_log("       ~s", [Line]),
+    %%try_cont_log("<b>PROMPT:</b> ~s", [FoundPrompt]),
     {RetTag,{prompt,FoundPrompt}};
 match_line(Line,[{prompt,PromptType}|Patterns],FoundPrompt,EO,RetTag) 
   when PromptType=/=FoundPrompt ->
@@ -1047,7 +1048,7 @@ match_line(Line,[{Tag,Pattern}|Patterns],FoundPrompt,EO,RetTag) ->
 	nomatch ->
 	    match_line(Line,Patterns,FoundPrompt,EO,RetTag);
 	{match,Match} ->
-	    try_cont_log("<b>MATCH:</b> ~s", [Line]),
+	    %%try_cont_log("<b>MATCH:</b> ~s", [Line]),
 	    {RetTag,{Tag,Match}}
     end;
 match_line(Line,[Pattern|Patterns],FoundPrompt,EO,RetTag) ->
@@ -1055,13 +1056,13 @@ match_line(Line,[Pattern|Patterns],FoundPrompt,EO,RetTag) ->
 	nomatch ->
 	    match_line(Line,Patterns,FoundPrompt,EO,RetTag);
 	{match,Match} ->
-	    try_cont_log("<b>MATCH:</b> ~s", [Line]),
+	    %%try_cont_log("<b>MATCH:</b> ~s", [Line]),
 	    {RetTag,Match}
     end;
 match_line(Line,[],FoundPrompt,EO,match) ->
     match_line(Line,EO#eo.haltpatterns,FoundPrompt,EO,halt);
 match_line(Line,[],_FoundPrompt,_EO,halt) ->
-    try_cont_log("       ~s", [Line]),
+    %%try_cont_log("       ~s", [Line]),
     nomatch.
 
 one_line([$\n|Rest],Line) ->
@@ -1085,7 +1086,8 @@ log_lines(String) ->
 	[] ->
 	    ok;
 	LastLine ->
-	    try_cont_log("       ~s", [LastLine])
+	    %%try_cont_log("       ~s", [LastLine])
+        ignore
     end.
 
 log_lines_not_last(String) ->
@@ -1093,7 +1095,7 @@ log_lines_not_last(String) ->
 	{[],LastLine} ->
 	    LastLine;
 	{String1,LastLine} ->
-	    try_cont_log("~s",[String1]),
+	    %%try_cont_log("~s",[String1]),
 	    LastLine
     end.
 
