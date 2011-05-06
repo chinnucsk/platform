@@ -73,7 +73,7 @@
 %% Tool internals
 -export([silent_teln_expect/5, teln_receive_until_prompt/3,
 	 start_log/1, log/3, cont_log/2, end_log/0,
-	 try_start_log/1, try_log/3, %%try_cont_log/2,
+	 try_start_log/1, try_log/3, try_cont_log/2,
      try_end_log/0]).
 
 
@@ -83,6 +83,7 @@
 -define(DEFAULT_PORT,23).
 
 -include("telnet_util.hrl").
+-include("elog.hrl").
 
 -record(state,{teln_pid,
 	       prx,
@@ -112,7 +113,7 @@ open(Name) ->
 %%%
 %%% @doc Open a telnet connection to the specified target host.
 open(Name,ConnType) ->
-    case telnet_util:get_key_from_name(Name) of
+    case ct_telnet_util:get_key_from_name(Name) of
 	{ok, unix} -> % unix host
 	    open(Name, ConnType, unix_telnet, Name);
 	{ok, Key} -> % any other, e.g. interwatch (iw), etc.
@@ -671,7 +672,7 @@ try_cont_log(Str,Args) ->
 %%% @hidden
 do_try_log(Func,Args) ->
     %% check if output is suppressed
-    case telnet_util:is_silenced(telnet) of
+    case ct_telnet_util:is_silenced(telnet) of
 	true ->
 	    ok;
 	false ->
@@ -736,8 +737,10 @@ teln_get_all_data(Pid,Prx,Data,Acc,LastLine) ->
 %% implements connect/2 and get_prompt_regexp/0.
 silent_teln_expect(Pid,Data,Pattern,Prx,Opts) ->
     Old = put(silent,true),
+    ?INFO("silent_teln_expect/5, Pattern = ~p",[Pattern]),
     %%try_cont_log("silent_teln_expect/5, Pattern = ~p",[Pattern]),
     Result = teln_expect(Pid,Data,Pattern,Prx,Opts),
+    ?INFO("silent_teln_expect -> ~p\n",[Result]),
     %%try_cont_log("silent_teln_expect -> ~p\n",[Result]),
     put(silent,Old),
     Result.
@@ -768,6 +771,7 @@ teln_expect(Pid,Data,Pattern0,Prx,Opts) -> HaltPatterns = case
 	     timeout=Timeout,
 	     seq=Seq,
 	     haltpatterns=HaltPatterns},
+    ?INFO("eo:~p",[EO]),
     
     case get_repeat(Opts) of
 	false ->
@@ -854,11 +858,13 @@ teln_expect1(Data,Pattern,Acc,EO) ->
 		end,
     case ExpectFun() of
 	{match,Match,Rest} ->
+        ?INFO("expect:~p, ~p",[Match, Rest]),
 	    {ok,Match,Rest};
 	{halt,Why,Rest} ->
 	    {halt,Why,Rest};
 	NotFinished ->
 	    %% Get more data
+        ?INFO("expect:~p",[NotFinished]),
 	    Fun = fun() -> get_data1(EO#eo.teln_pid) end,
 	    case ct_gen_conn:do_within_time(Fun, EO#eo.timeout) of
 		{error,Reason} -> 
@@ -866,6 +872,7 @@ teln_expect1(Data,Pattern,Acc,EO) ->
 		    %% is idle for EO#eo.timeout milliseconds.
 		    {error,Reason};
 		{ok,Data1} ->
+            ?INFO("gen_conn:~p", [Data1]),
 		    case NotFinished of
 			{nomatch,Rest} ->
 			    %% One expect
@@ -893,12 +900,14 @@ get_data1(Pid) ->
 
 %% one_expect: split data chunk at prompts
 one_expect(Data,Pattern,EO) ->
+    ?INFO("prompt:~p",[match_prompt(Data,EO#eo.prx)]),
     case match_prompt(Data,EO#eo.prx) of
 	{prompt,UptoPrompt,PromptType,Rest} ->
 	    case Pattern of 
 		[Prompt] when Prompt==prompt; Prompt=={prompt,PromptType} ->
 		    %% Only searching for prompt
 		    log_lines(UptoPrompt),
+		    ?INFO("<b>PROMPT:</b> ~s", [PromptType]),
 		    %%try_cont_log("<b>PROMPT:</b> ~s", [PromptType]),
 		    {match,{prompt,PromptType},Rest};
 		[{prompt,_OtherPromptType}] ->
@@ -914,6 +923,7 @@ one_expect(Data,Pattern,EO) ->
 		[Prompt] when Prompt==prompt; element(1,Prompt)==prompt ->
 		    %% Only searching for prompt
 		    LastLine = log_lines_not_last(Data),
+            ?INFO("get lastline:~p", [LastLine]),
 		    {nomatch,LastLine};
 		_ ->
 		    one_expect1(Data,Pattern,[],EO#eo{found_prompt=false})
@@ -1032,13 +1042,13 @@ match_line(Line,Patterns,FoundPrompt,EO) ->
 match_line(Line,[prompt|Patterns],false,EO,RetTag) ->
     match_line(Line,Patterns,false,EO,RetTag);
 match_line(Line,[prompt|_Patterns],FoundPrompt,_EO,RetTag) ->
-    %%try_cont_log("       ~s", [Line]),
-    %%try_cont_log("<b>PROMPT:</b> ~s", [FoundPrompt]),
+    ?INFO("       ~s", [Line]),
+    ?INFO("<b>PROMPT:</b> ~s", [FoundPrompt]),
     {RetTag,{prompt,FoundPrompt}};
 match_line(Line,[{prompt,PromptType}|_Patterns],FoundPrompt,_EO,RetTag) 
   when PromptType==FoundPrompt ->
-    %%try_cont_log("       ~s", [Line]),
-    %%try_cont_log("<b>PROMPT:</b> ~s", [FoundPrompt]),
+    ?INFO("       ~s", [Line]),
+    ?INFO("<b>PROMPT:</b> ~s", [FoundPrompt]),
     {RetTag,{prompt,FoundPrompt}};
 match_line(Line,[{prompt,PromptType}|Patterns],FoundPrompt,EO,RetTag) 
   when PromptType=/=FoundPrompt ->
@@ -1087,16 +1097,18 @@ log_lines(String) ->
 	    ok;
 	LastLine ->
 	    %%try_cont_log("       ~s", [LastLine])
-        ignore
+	    ?INFO("       ~s", [LastLine])
     end.
 
 log_lines_not_last(String) ->
+    ?INFO("get string :~p",[String]),
     case add_tabs(String,[],[]) of
 	{[],LastLine} ->
 	    LastLine;
 	{String1,LastLine} ->
 	    %%try_cont_log("~s",[String1]),
-	    LastLine
+	    ?INFO("~s",[String1]),
+        LastLine
     end.
 
 add_tabs([0|Rest],Acc,LastLine) ->

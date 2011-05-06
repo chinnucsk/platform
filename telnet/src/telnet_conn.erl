@@ -22,9 +22,13 @@
 -define(CONN_TIMEOUT, 10000).
 -define(CALL_TIMEOUT, 12000).
 
--define(username,"login: ").
--define(password,"Password: ").
--define(prx,"login: |Password: |\\\$ |> ").
+%-define(username,"login: ").
+%-define(password,"Password: ").
+%-define(prx,"login: |Password: |\\\$ |> ").
+
+-define(username,"Username:").
+-define(password,"Password:").
+-define(prx,"Username:|Password:|\\\#|> ").
 
 -define(keepalive, true).
 
@@ -84,6 +88,7 @@ connect(Ip,Port,Timeout,KeepAlive,Username,Password) ->
     ?INFO("telnet:connect",[]),
     Result =case telnet_client:open(Ip,Port,Timeout,KeepAlive) of
                 {ok,Pid} ->
+                    ?INFO("open success...~p",[Pid]),
                     case telnet:silent_teln_expect(Pid,[],[prompt],?prx,[]) of
                         {ok,{prompt,?username},_} ->
                         ok = telnet_client:send_data(Pid,Username),
@@ -91,8 +96,8 @@ connect(Ip,Port,Timeout,KeepAlive,Username,Password) ->
                         case telnet:silent_teln_expect(Pid,[],prompt,?prx,[]) of
                             {ok,{prompt,?password},_} ->
                             ok = telnet_client:send_data(Pid,Password),
-                            Stars = lists:duplicate(length(Password),$*),
-                            ?INFO("Password: ~s",[Stars]),
+%                            Stars = lists:duplicate(length(Password),$*),
+                            ?INFO("Password: ~s",[Password]),
                             ok = telnet_client:send_data(Pid,""),
                             case telnet:silent_teln_expect(Pid,[],prompt,
                                               ?prx,[]) of
