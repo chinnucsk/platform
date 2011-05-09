@@ -163,7 +163,7 @@ init([Opts]) ->
                         socket   = Sock,
                         data     = <<>>
                       },
-                ?PRINT("~nmysql connection is starting...[done]~n", []),
+                %?PRINT("~nmysql connection is starting...[done]~n", []),
 			    {ok, State}
             end;
 		{error, Reason} ->
