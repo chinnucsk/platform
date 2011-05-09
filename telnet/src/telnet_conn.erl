@@ -22,13 +22,13 @@
 -define(CONN_TIMEOUT, 10000).
 -define(CALL_TIMEOUT, 12000).
 
-%-define(username,"login: ").
-%-define(password,"Password: ").
-%-define(prx,"login: |Password: |\\\$ |> ").
+-define(username,"login: ").
+-define(password,"Password: ").
+-define(prx,"login: |Password: |\\\$ |> ").
 
--define(username,"Username:").
--define(password,"Password:").
--define(prx,"Username:|Password:|\\\#|> ").
+%-define(username,"Username:").
+%-define(password,"Password:").
+%-define(prx,"Username:|Password:|\\\#|> ").
 
 -define(keepalive, true).
 
