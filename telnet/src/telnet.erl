@@ -82,7 +82,6 @@
 -define(DEFAULT_TIMEOUT,10000).
 -define(DEFAULT_PORT,23).
 
--include("telnet_util.hrl").
 -include("elog.hrl").
 
 -record(state,{teln_pid,
