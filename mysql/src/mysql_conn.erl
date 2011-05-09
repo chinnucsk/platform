@@ -53,6 +53,7 @@
 
 -define(MYSQL_QUERY_OP, 3).
 
+%CALL > CONNECT
 -define(CALL_TIMEOUT, 30000).
 
 -define(CONNECT_TIMEOUT, 30000).
