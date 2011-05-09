@@ -10,7 +10,12 @@
 -module(extbif).
 
 -export([datetime/0,
+        datetime/1,
         timestamp/0, 
+        strftime/0,
+        strftime/1,
+        microsecs/0,
+        millsecs/0,
         to_atom/1,
         to_list/1, 
         to_binary/1, 
@@ -19,12 +24,33 @@
         binary_split/2,
         to_integer/1]).
 
-datetime() ->
-    calendar:local_time().
-
 timestamp() ->
 	{MegaSecs, Secs, _MicroSecs} = erlang:now(),
 	MegaSecs * 1000000 + Secs.
+
+microsecs() ->
+    {Mega,Sec,Micro} = erlang:now(),
+    (Mega*1000000+Sec)*1000000+Micro.
+
+millsecs() ->
+    microsecs() div 100.
+
+datetime() ->
+    calendar:local_time().
+
+strftime() ->
+    strftime({date(), time()}).
+
+strftime(DateTime) ->
+    {{Y,M,D}, {H,MM,S}} = DateTime,
+    Date = string:join([zeropad(I) || I <- [Y,M,D]], "-"),
+    Time = string:join([zeropad(I) || I <- [H, MM, S]], ":"),
+    lists:concat([Date, " ", Time]).
+    
+datetime(Seconds) when is_integer(Seconds) ->
+    BaseDate = calendar:datetime_to_gregorian_seconds({{1970,1,1},{0,0,0}}),
+    Universal = calendar:gregorian_seconds_to_datetime(BaseDate + Seconds),
+    calendar:universal_time_to_local_time(Universal).
 
 to_atom(L) when is_list(L) -> 
     list_to_atom(L);
@@ -94,3 +120,7 @@ binary_split(<<C1, Rest/binary>>, C, Acc, Tokens) ->
 binary_split(<<>>, _C, Acc, Tokens) ->
     lists:reverse([Acc | Tokens]).
 
+zeropad(I) when I < 10 ->
+    lists:concat(["0", I]);
+zeropad(I) ->
+    integer_to_list(I).
