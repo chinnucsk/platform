@@ -703,7 +703,7 @@ debug_cont_log(Str,Args) ->
 %%%=================================================================
 %%% Abstraction layer on top of ct_telnet_client.erl
 teln_cmd(Pid,Cmd,Prx,Timeout) ->
-    ct_telnet_client:send_data(Pid,Cmd),
+    telnet_client:send_data(Pid,Cmd),
     teln_receive_until_prompt(Pid,Prx,Timeout).
 
 

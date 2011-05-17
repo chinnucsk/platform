@@ -41,7 +41,7 @@ get_data(Pid, Cmd) ->
     Resp = telnet_client:get_data(Pid),
     {ok, Resp}.
 
-send_data(Pid, Cmd) ->
+get_all_data(Pid, Cmd) ->
      telnet_client:send_data(Pid, Cmd),
      ok.
 
