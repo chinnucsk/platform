@@ -3,13 +3,13 @@
 -author("hejin-2011-5-16").
 
 -export([start/1,
-        get_data/2,
-        send_data/2
+        get_data/2
         ]).
 
 -include("elog.hrl").
 
 -define(CONN_TIMEOUT, 10000).
+-define(CMD_TIMEOUT, 10000).
 
 -define(username,"Username:").
 -define(password,"Password:").
@@ -42,9 +42,8 @@ get_data(Pid, Cmd) ->
     {ok, Resp}.
 
 get_all_data(Pid, Cmd) ->
-     telnet_client:send_data(Pid, Cmd),
-     ok.
-
+     telnet_client:send_data(Pid,Cmd),
+     telnet:teln_receive_until_prompt(Pid,?prx,?CMD_TIMEOUT).
 
 
 init(Opts) ->
