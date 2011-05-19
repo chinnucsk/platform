@@ -2,7 +2,7 @@
 -define(RECONN_TIMEOUT,5000).
 -define(DEFAULT_TIMEOUT,10000).
 -define(DEFAULT_PORT,23).
--define(DEFAULT_Mod,unix).
+-define(DEFAULT_Mod,unix_telnet).
 
 -record(state,{teln_pid,
 	       prx,
