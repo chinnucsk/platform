@@ -1,12 +1,12 @@
 %%%----------------------------------------------------------------------
 %%% Usage:
-%%%    {ok,Pid}=wifioss_telnet:connect("192.168.1.31","opengoss","public").
+%%%    {ok,Pid}=wifioss_telnet:connect(zte_olt_telnet,"192.168.1.31","opengoss","public").
 %%%    wifioss_telnet:cmd(Pid,"ls .").
 %%%    wifioss_telnet:close(Pid).
 %%%----------------------------------------------------------------------
 
 -module(wifioss_telnet).
--include("wifioss_telnet.hrl").
+-include("telnet.hrl").
 -include("elog.hrl").
 -export([connect/3, connect/4, connect/5,close/1]).
 -export([cmd/2, cmd/3]).
@@ -38,7 +38,7 @@ connect(TargetMod,Ip,UserName,Password) ->
 connect(TargetMod,Ip,Port,UserName,Password) ->
     Self = self(),
     Pid  = spawn(fun() -> 
-    wifioss_gen_conn:init_gen(Self,Ip,Port,UserName,Password,#state{target_mod=TargetMod})
+    telnet_gen_conn:init_gen(Self,Ip,Port,UserName,Password,#state{target_mod=TargetMod})
            end),
     MRef = erlang:monitor(process,Pid),
     receive 

@@ -9,25 +9,14 @@
 -include("elog.hrl").
 
 -define(CONN_TIMEOUT, 10000).
--define(CMD_TIMEOUT, 10000).
+-define(CMD_TIMEOUT, 3000).
 
 -define(username,"Username:").
 -define(password,"Password:").
--define(prx,"Username:|Password:|\\\#|> ").
+-define(prx,"Username:|Password:|\\\#|> |--More--").
 
 -define(keepalive, true).
 
--record(state, {
-	  host,
-	  port,
-	  user,
-	  password,
-	  socket,
-	  conn_state
-	 }).
-
-
-%%%%%%%%%%%%%%%%%%% extra interface %%%%%%%%%%%%%%%%%
 start(Opts) ->
     case init(Opts) of
     {ok, Pid} ->
@@ -37,13 +26,22 @@ start(Opts) ->
     end.
 
 get_data(Pid, Cmd) ->
-    telnet_client:send_data(Pid, Cmd),
-    Resp = telnet_client:get_data(Pid),
-    {ok, Resp}.
+    get_data(Pid, Cmd, []).
 
-get_all_data(Pid, Cmd) ->
-     telnet_client:send_data(Pid,Cmd),
-     telnet:teln_receive_until_prompt(Pid,?prx,?CMD_TIMEOUT).
+get_data(Pid, Cmd, Acc) ->
+    case telent_gen_conn:teln_cmd(Pid, Cmd, ?prx, ?CMD_TIMEOUT) of
+        {ok, Data, "--More--",Rest} ->
+            ?INFO("more: ~p, ~n, ~p", [Data, Rest]),
+             get_data(Pid, " ", [Data|Acc]);
+        {ok, Data, _PromptType,Rest} ->
+            ?INFO("Return: ~p, ~n, ~p", [Data, Rest]),
+            AllData = lists:flatten(lists:reverse([Data|Acc])),
+            {ok, AllData};
+        Error ->
+            Retry = {retry, no, {cmd,Cmd}},
+            ?INFO("Return: ~p", [Error]),
+            Retry
+    end.
 
 
 init(Opts) ->
@@ -54,7 +52,7 @@ init(Opts) ->
     Password = proplists:get_value(password, Opts, "public"),
     case (catch connect(Host, Port, ?CONN_TIMEOUT, ?keepalive, Username, Password)) of
 	{ok, Pid} ->
-	    {ok, #state{host = Host, port = Port, socket = Pid, user = Username, password = Password, conn_state = connected}};
+	    {ok, Pid};
 	{error, Error} ->
 	    {stop, Error};
     {'EXIT', Reason} ->
@@ -80,7 +78,8 @@ connect(Ip,Port,Timeout,KeepAlive,Username,Password) ->
                                               ?prx,[]) of
                                 {ok,{prompt,Prompt},_}
                                 when Prompt=/=?username, Prompt=/=?password ->
-                                {ok,Pid};
+                                    ?INFO("get data over.............", []),
+                                    {ok,Pid};
                                 Error ->
                                 ?WARNING("Password failed\n~p\n",
                                      [Error]),
@@ -98,6 +97,6 @@ connect(Ip,Port,Timeout,KeepAlive,Username,Password) ->
                     end;
                 Error ->
                     ?WARNING("Could not open telnet connection\n~p\n",[Error]),
-                            Error
+                    {error, Error}
 	end,
     Result.
