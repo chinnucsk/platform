@@ -1,4 +1,4 @@
-include include.mk
+include ../../support/include.mk
 
 all: $(EBIN_FILES)
 
