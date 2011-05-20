@@ -3,7 +3,8 @@
 -author("hejin-2011-5-16").
 
 -export([start/1,
-        get_data/2
+        get_data/2,
+        close/1
         ]).
 
 -include("elog.hrl").
@@ -29,20 +30,24 @@ get_data(Pid, Cmd) ->
     get_data(Pid, Cmd, []).
 
 get_data(Pid, Cmd, Acc) ->
-    case telent_gen_conn:teln_cmd(Pid, Cmd, ?prx, ?CMD_TIMEOUT) of
+    case telnet_gen_conn:teln_cmd(Pid, Cmd, ?prx, ?CMD_TIMEOUT) of
         {ok, Data, "--More--",Rest} ->
             ?INFO("more: ~p, ~n, ~p", [Data, Rest]),
-             get_data(Pid, " ", [Data|Acc]);
+            Data1 =  string:join(Data, "\r\n"),
+             get_data(Pid, " ", [Data1|Acc]);
         {ok, Data, _PromptType,Rest} ->
-            ?INFO("Return: ~p, ~n, ~p", [Data, Rest]),
-            AllData = lists:flatten(lists:reverse([Data|Acc])),
+            ?INFO("Return: ~p, ~p, ~n, ~p", [Data, Rest, Acc]),
+            Data1 =  string:join(Data, "\r\n"),
+            AllData = string:join(lists:reverse([Data1|Acc]), "\r\n"),
             {ok, AllData};
         Error ->
-            Retry = {retry, no, {cmd,Cmd}},
+            Retry = {error, {cmd, Cmd, Error}},
             ?INFO("Return: ~p", [Error]),
             Retry
     end.
 
+close(Pid) ->
+    telnet_client:close(Pid).
 
 init(Opts) ->
     io:format("starting telnet conn ...~p",[Opts]),

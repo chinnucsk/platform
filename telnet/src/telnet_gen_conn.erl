@@ -204,6 +204,9 @@ split_lines([$\n|Rest],Line,Lines) ->
     split_lines(Rest,[],[lists:reverse(Line)|Lines]);
 split_lines([$\r|Rest],Line,Lines) ->
     split_lines(Rest,Line,Lines);
+%add hejin 2011-5-20 写文件，操作符无意义
+split_lines([$\b|Rest],Line,Lines) ->
+    split_lines(Rest,Line,Lines);
 split_lines([0|Rest],Line,Lines) ->
     split_lines(Rest,Line,Lines);
 split_lines([Char|Rest],Line,Lines) ->
@@ -243,7 +246,9 @@ split_prompt_string([Ch|Rest],_Start,End,N,UptoPrompt,Prompt) when N==End ->
 	    %% written when telnet connection is openend.
 	    {noprompt,[Ch|Prompt]++UptoPrompt,Rest};
 	_ ->
-	    {prompt,[Ch|Prompt]++UptoPrompt,[Ch|Prompt],Rest}
+        %get data  no need prompt, hejin 2011-5-20
+	    %{prompt,[Ch|Prompt]++UptoPrompt,[Ch|Prompt],Rest}
+	    {prompt,UptoPrompt,[Ch|Prompt],Rest}
     end.
 
 do_within_time(Fun,Timeout) ->
