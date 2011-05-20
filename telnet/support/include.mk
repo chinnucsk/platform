@@ -1,7 +1,7 @@
 ## -*- makefile -*-
 
 ## Erlang
-ROOT := ../..
+ROOT := /opt/platform/telnet
 
 ERL := erl
 ERLC := $(ERL)c
