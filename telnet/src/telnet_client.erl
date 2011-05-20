@@ -35,6 +35,8 @@
 -export([open/1, open/2, open/3, open/4, close/1]).
 -export([send_data/2, get_data/1]).
 
+-include("elog.hrl").
+
 -define(TELNET_PORT, 23).
 -define(OPEN_TIMEOUT,10000).
 -define(IDLE_TIMEOUT,10000).
@@ -105,19 +107,19 @@ get_data(Pid) ->
 init(Parent, Server, Port, Timeout, KeepAlive) ->
     case gen_tcp:connect(Server, Port, [list,{packet,0}], Timeout) of
 	{ok,Sock} ->
-	    dbg("Connected to: ~p (port: ~w, keep_alive: ~w)\n", [Server,Port,KeepAlive]),
+	    ?INFO("Connected to: ~p (port: ~w, keep_alive: ~w)\n", [Server,Port,KeepAlive]),
 	    send([?IAC,?DO,?SUPPRESS_GO_AHEAD], Sock),	      
 	    Parent ! {open,self()},
 	    loop(#state{get_data=10, keep_alive=KeepAlive}, Sock, []),
 	    gen_tcp:close(Sock);
-        Error ->
+     Error ->
 	    Parent ! {Error,self()}
     end.
 
 loop(State, Sock, Acc) ->
     receive
 	{tcp_closed,_} ->
-	    dbg("Connection closed\n", []),
+	    ?INFO("Connection closed\n", []),
 	    receive
 		{get_data,Pid} ->
 		    Pid ! closed
@@ -125,7 +127,7 @@ loop(State, Sock, Acc) ->
 		    ok
 	    end;
 	{tcp,_,Msg0} ->
-	    dbg("tcp msg: ~p~n",[Msg0]),
+	    ?INFO("tcp msg: ~p~n",[Msg0]),
 	    Msg = check_msg(Sock,Msg0,[]),
 	    loop(State, Sock, [Msg | Acc]);
 	{send_data,Data} ->
@@ -135,7 +137,7 @@ loop(State, Sock, Acc) ->
 	    NewState = 
 		case Acc of
 		    [] ->
-			dbg("get_data nodata\n",[]),
+			?INFO("get_data nodata\n",[]),
 			erlang:send_after(100,self(),{get_data_delayed,Pid}),
 			if State#state.keep_alive == true ->
 				State#state{get_data=State#state.get_data - 1};
@@ -158,6 +160,7 @@ loop(State, Sock, Acc) ->
 		    _ ->
 			State
 		end,
+        ?INFO("get_data_delayed,acc: ~p",[Acc]),
 	    NewAcc = 
 		case erlang:is_process_alive(Pid) of
 		    true ->
@@ -168,7 +171,7 @@ loop(State, Sock, Acc) ->
 		end,
 	    loop(NewState, Sock, NewAcc);			       
 	close ->
-	    dbg("Closing connection\n", []),
+	    ?INFO("Closing connection\n", []),
 	    gen_tcp:close(Sock),
 	    ok
     after wait(State#state.keep_alive,?IDLE_TIMEOUT) ->
@@ -187,20 +190,22 @@ send(Data, Sock) ->
 	[?IAC|_] = Cmd ->
 	    cmd_dbg(Cmd);
 	_ ->
-	    dbg("Sending: ~p\n", [Data])
+	    ?INFO("Sending: ~p\n", [Data])
     end,
     gen_tcp:send(Sock, Data),
     ok.
 
 %% [IAC,IAC] = buffer data value 255
 check_msg(Sock, [?IAC,?IAC | T], Acc) ->
+    ?INFO("get buffer data :~p", [T]),
     check_msg(Sock, T, [?IAC|Acc]);
 
 %% respond to a command
 check_msg(Sock, [?IAC | Cs], Acc) ->
+    ?INFO("get command :~p", [Cs]),
     case get_cmd(Cs) of
 	{Cmd,Cs1} ->
-	    dbg("Got ", []), 
+	    ?INFO("Got ", []),
 	    cmd_dbg(Cmd),
 	    respond_cmd(Cmd, Sock),
 	    check_msg(Sock, Cs1, Acc); 
@@ -231,10 +236,10 @@ respond_cmd([?DO,?ECHO], Sock) ->
 %% Answers from server
 
 respond_cmd([?WILL,?SUPPRESS_GO_AHEAD], _Sock) ->
-    dbg("Server will suppress-go-ahead\n", []);
+    ?INFO("Server will suppress-go-ahead\n", []);
 
 respond_cmd([?WONT,?SUPPRESS_GO_AHEAD], _Sock) ->
-    dbg("Warning! Server won't suppress-go-ahead\n", []);
+    ?INFO("Warning! Server won't suppress-go-ahead\n", []);
 
 respond_cmd([?DONT | _Opt], _Sock) ->		% server ack?
     ok;						
@@ -261,10 +266,10 @@ respond_cmd(?NOP, _Sock) ->
 %% Unexpected messages.
 
 respond_cmd([Cmd | Opt], _Sock) when Cmd >= 240, Cmd =< 255 ->
-    dbg("Received cmd: ~w. Ignored!\n", [[Cmd | Opt]]);
+    ?INFO("Received cmd: ~w. Ignored!\n", [[Cmd | Opt]]);
 
 respond_cmd([Cmd | Opt], _Sock)  ->
-    dbg("WARNING: Received unknown cmd: ~w. Ignored!\n", [[Cmd | Opt]]).
+    ?INFO("WARNING: Received unknown cmd: ~w. Ignored!\n", [[Cmd | Opt]]).
 
 
 get_cmd([Cmd | Rest]) when Cmd == ?SB ->
@@ -308,9 +313,9 @@ cmd_dbg(_Cmd) ->
 		    [Opt] -> Opt;
 		    _ -> Opts
 		end,
-	    io:format("~s(~w): ~w\n", [CtrlStr,Ctrl,Opts1]);
+	    ?INFO("~s(~w): ~w\n", [CtrlStr,Ctrl,Opts1]);
 	Any  ->
-	    io:format("Unexpected in cmd_dbg:~n~w~n",[Any])
+	    ?INFO("Unexpected in cmd_dbg:~n~w~n",[Any])
     end.
 
 -else.

@@ -1,11 +1,11 @@
--module(wifioss_gen_conn).
--include("wifioss_telnet.hrl").
+-module(telnet_gen_conn).
+-include("telnet.hrl").
 -include("elog.hrl").
 %%TODO gen_server ?
 %% Callbacks
 -export([init/5,init_gen/6,handle_msg/2,reconnect/1,terminate/2]).
 
--export([teln_receive_until_prompt/3]).
+-export([teln_receive_until_prompt/3, teln_cmd/4, do_within_time/2]).
 
 init_gen(Parent,Ip,Port,UserName,Password,S0) ->
     process_flag(trap_exit,true),
@@ -177,11 +177,14 @@ teln_receive_until_prompt(Pid,Prx,Timeout) ->
 
 teln_receive_until_prompt(Pid,Prx,Acc,LastLine) ->
     {ok,Data} = telnet_client:get_data(Pid),
+    ?INFO("get data :~p, ~n, ~p", [Data, LastLine]),
     case check_for_prompt(Prx,LastLine ++ Data) of
 	{prompt,Lines,PromptType,Rest} ->
+        ?INFO("get prompt :~p, ~p, ~p", [Lines, PromptType, Rest]),
 	    Return = lists:reverse(lists:append([Lines|Acc])),
 	   {ok,Return,PromptType,Rest};
 	{noprompt,Lines,LastLine1} ->
+        ?INFO("get noprompt :~p, ~p", [Lines, LastLine1]),
 	    teln_receive_until_prompt(Pid,Prx,[Lines|Acc],LastLine1)
    end.
 
@@ -200,6 +203,9 @@ split_lines(String) ->
 split_lines([$\n|Rest],Line,Lines) ->
     split_lines(Rest,[],[lists:reverse(Line)|Lines]);
 split_lines([$\r|Rest],Line,Lines) ->
+    split_lines(Rest,Line,Lines);
+%add hejin 2011-5-20 写文件，操作符无意义
+split_lines([$\b|Rest],Line,Lines) ->
     split_lines(Rest,Line,Lines);
 split_lines([0|Rest],Line,Lines) ->
     split_lines(Rest,Line,Lines);
@@ -240,7 +246,9 @@ split_prompt_string([Ch|Rest],_Start,End,N,UptoPrompt,Prompt) when N==End ->
 	    %% written when telnet connection is openend.
 	    {noprompt,[Ch|Prompt]++UptoPrompt,Rest};
 	_ ->
-	    {prompt,[Ch|Prompt]++UptoPrompt,[Ch|Prompt],Rest}
+        %get data  no need prompt, hejin 2011-5-20
+	    %{prompt,[Ch|Prompt]++UptoPrompt,[Ch|Prompt],Rest}
+	    {prompt,UptoPrompt,[Ch|Prompt],Rest}
     end.
 
 do_within_time(Fun,Timeout) ->
@@ -261,6 +269,7 @@ do_within_time(Fun,Timeout) ->
 	    {error,connection_closed}
     after 
 	Timeout ->
+        ?INFO("time out ...", []),
 	    exit(TmpPid,kill),
 	    receive
 		{TmpPid,Result} ->

@@ -865,7 +865,7 @@ teln_expect1(Data,Pattern,Acc,EO) ->
 	    %% Get more data
         ?INFO("expect:~p",[NotFinished]),
 	    Fun = fun() -> get_data1(EO#eo.teln_pid) end,
-	    case ct_gen_conn:do_within_time(Fun, EO#eo.timeout) of
+	    case telnet_gen_conn:do_within_time(Fun, EO#eo.timeout) of
 		{error,Reason} -> 
 		    %% A timeout will occur when the telnet connection
 		    %% is idle for EO#eo.timeout milliseconds.

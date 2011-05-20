@@ -1,4 +1,4 @@
--module(unix).
+-module(unix_telnet).
 -compile(export_all).
 
 -export([connect/6,get_prompt_regexp/0]).
