@@ -1,4 +1,4 @@
--module(telnet_conn).
+-module(unix_telnet).
 
 -author("hejin-2011-4-27").
 
