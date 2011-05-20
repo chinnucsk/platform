@@ -19,12 +19,7 @@
 -define(keepalive, true).
 
 start(Opts) ->
-    case init(Opts) of
-    {ok, Pid} ->
-        {ok, Pid};
-    {error, _Error} ->
-        {ok, undefined}
-    end.
+    init(Opts).
 
 get_data(Pid, Cmd) ->
     get_data(Pid, Cmd, []).
@@ -41,9 +36,10 @@ get_data(Pid, Cmd, Acc) ->
             AllData = string:join(lists:reverse([Data1|Acc]), "\r\n"),
             {ok, AllData};
         Error ->
-            Retry = {error, {cmd, Cmd, Error}},
-            ?INFO("Return: ~p", [Error]),
-            Retry
+            ?WARNING("Return error: ~p", [Error]),
+            Data1 = io_lib:format("telnet send cmd error, cmd: ~p, reason:~p", [Cmd, Error]),
+            AllData = string:join(lists:reverse([Data1|Acc]), "\r\n"),
+            {ok, AllData}
     end.
 
 close(Pid) ->
