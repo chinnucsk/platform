@@ -1,7 +1,6 @@
-include ../../include.mk
+include include.mk
 
 all: $(EBIN_FILES)
-	(cd plugins;$(MAKE))
 
 debug:
 	$(MAKE) DEBUG=-DDEBUG
