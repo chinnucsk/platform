@@ -19,11 +19,7 @@ get_value(Key, DataSet) ->
 	{value, {_, Value}} -> 
 	    {value, Value};
 	_ ->
-<<<<<<< HEAD
-	    Key
-=======
 	    {false, Key}
->>>>>>> d62b5aa62b22f97591ad06c972e4aae5264f996a
     end.
 
 get_value(Key, DataSet, Default) ->

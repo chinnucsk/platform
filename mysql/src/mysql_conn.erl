@@ -7,7 +7,6 @@
 %%%
 %%% Copyright (C) 2007-2010, www.opengoss.com 
 %%%----------------------------------------------------------------------
-%%TODO: should be gen_server, fuck
 -module(mysql_conn).
 
 -include("elog.hrl").
@@ -54,9 +53,9 @@
 -define(MYSQL_QUERY_OP, 3).
 
 %CALL > CONNECT
--define(CALL_TIMEOUT, 30000).
+-define(CALL_TIMEOUT, 60000).
 
--define(CONNECT_TIMEOUT, 30000).
+-define(CONNECT_TIMEOUT, 60000).
 
 -define(MYSQL_4_0, 40). %% Support for MySQL 4.0.x
 

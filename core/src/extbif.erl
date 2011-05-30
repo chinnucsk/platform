@@ -22,7 +22,8 @@
         binary_to_atom/1, 
         atom_to_binary/1,
         binary_split/2,
-        to_integer/1]).
+        to_integer/1,
+        zeropad/1]).
 
 timestamp() ->
 	{MegaSecs, Secs, _MicroSecs} = erlang:now(),
