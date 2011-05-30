@@ -7,7 +7,6 @@
 %%%
 %%% Copyright (C) 2007-2010, www.opengoss.com 
 %%%----------------------------------------------------------------------
-%%TODO: should be gen_server, fuck
 -module(mysql_conn).
 
 -include("elog.hrl").
