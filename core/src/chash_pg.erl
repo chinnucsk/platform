@@ -29,7 +29,7 @@
 
 -record(state, {links = []}).
 
--define(VNODES_NUM, 80).
+-define(VNODES_NUM, 40).
 
 %%%-----------------------------------------------------------------
 %%% This module implements distributed process groups based on consistent 
