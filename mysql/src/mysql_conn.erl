@@ -53,9 +53,9 @@
 -define(MYSQL_QUERY_OP, 3).
 
 %CALL > CONNECT
--define(CALL_TIMEOUT, 60000).
+-define(CALL_TIMEOUT, 200000).
 
--define(CONNECT_TIMEOUT, 60000).
+-define(CONNECT_TIMEOUT, 200000).
 
 -define(MYSQL_4_0, 40). %% Support for MySQL 4.0.x
 
@@ -424,7 +424,8 @@ get_query_response(RecvPid, Version) ->
 	    case Fieldcount of
 		0 ->
 		    %% No Tabular data
-		    <<AffectedRows:8, InsertId:8, _Rest2/binary>> = Rest,
+            {AffectedRows, Rest1} = decode_length_binary(Rest),
+            {InsertId, _} = decode_length_binary(Rest1),
 		    {updated, #mysql_result{insert_id = InsertId, affectedrows=AffectedRows}};
 		255 ->
 		    <<_Code:16/little, Message/binary>>  = Rest,
@@ -446,6 +447,24 @@ get_query_response(RecvPid, Version) ->
 	    end;
 	{error, Reason} ->
 	    {error, Reason}
+    end.
+
+decode_length_binary(<<Len:8, Rest/binary>>) ->
+    if
+    Len =< 251 -> 
+        {Len, Rest};
+    Len == 252 -> %two bytes
+        <<Val:16/little, Rest1/binary>> = Rest,
+        {Val, Rest1};
+    Len == 253 -> %three
+        <<Val:24/little, Rest1/binary>> = Rest,
+        {Val, Rest1};
+    Len == 254 -> %eight
+        <<Val:64/little, Rest1/binary>> = Rest,
+        {Val, Rest1};
+    true ->
+        ?ERROR("affectedrows: ~p", [Len]),
+        {0, Rest}
     end.
 
 %%--------------------------------------------------------------------

@@ -42,6 +42,7 @@ insert(Tab0, Record) ->
 	Fields = string:join([atom_to_list(F) || {F, _} <- Record], ","),
 	Values = string:join([encode(V) || {_, V} <- Record], ","),
     Query = ["insert into ", Tab, "(", Fields, ") values(", Values, ");"],
+    ?INFO("~p", [list_to_binary(Query)]),
     sql_query(list_to_binary(Query)).
 
 select(Tab) ->
