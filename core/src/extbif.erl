@@ -9,7 +9,8 @@
 %%%----------------------------------------------------------------------
 -module(extbif).
 
--export([datetime/0,
+-export([appvsn/0,
+        datetime/0,
         datetime/1,
         timestamp/0, 
         strftime/0,
@@ -24,6 +25,13 @@
         binary_split/2,
         to_integer/1,
         zeropad/1]).
+
+appvsn() ->
+    App = application:get_application(),
+    case application:get_key(App, vsn) of
+    {ok, Vsn} -> Vsn;
+    undefined -> "unknown"
+    end.
 
 timestamp() ->
 	{MegaSecs, Secs, _MicroSecs} = erlang:now(),
