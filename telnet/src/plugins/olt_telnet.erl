@@ -14,31 +14,42 @@
 
 -define(username,"Username:").
 -define(password,"Password:").
--define(prx,"Username:|Password:|\\\#|> |--More--").
+-define(prx,"Username:|Password:|\\\-3#|> |--More--").
 
 -define(keepalive, true).
+
+-define(splite, "\n").
 
 start(Opts) ->
     init(Opts).
 
 get_data(Pid, Cmd) ->
-    get_data(Pid, Cmd, []).
+    get_data(Pid, Cmd, [], []).
 
-get_data(Pid, Cmd, Acc) ->
+get_data(Pid, Cmd, Acc, LastLine) ->
     case telnet_gen_conn:teln_cmd(Pid, Cmd, ?prx, ?CMD_TIMEOUT) of
         {ok, Data, "--More--",Rest} ->
-            ?INFO("more: ~p, ~n, ~p", [Data, Rest]),
-            Data1 =  string:join(Data, "\n"),
-             get_data(Pid, " ", [Data1|Acc]);
-        {ok, Data, _PromptType,Rest} ->
-            ?INFO("Return: ~p, ~p, ~n, ~p", [Data, Rest, Acc]),
-            Data1 =  string:join(Data, "\n"),
-            AllData = string:join(lists:reverse([Data1|Acc]), "\n"),
-            {ok, AllData};
+            Lastline1 = string:strip(lists:last(Data)),
+            ?INFO("more: ~p, lastline: ~p, ~n, Rest : ~p", [Data, Lastline1, Rest]),
+            Data1 =  string:join(Data, ?splite),
+            get_data(Pid, " ", [Data1|Acc], Lastline1);
+        {ok, Data, PromptType, Rest} ->
+            ?INFO("Return: ~p, PromptType : ~p, ~n, Rest :~p", [Data, PromptType, Rest]),
+            Data1 =  string:join(Data, ?splite),
+            Lastline1 = string:strip(lists:last(Data)),
+            case  Lastline1 of
+                LastLine ->
+                    ?INFO("get end Lastline  ~p, ~n, acc :~p", [Lastline1, Acc]),
+                    AllData = string:join(lists:reverse([Data1|Acc]), ?splite),
+                    {ok, AllData};
+                _ ->
+                    Data2 = Data1 ++ PromptType ++ Rest,
+                    get_data(Pid, " ", [Data2|Acc], Lastline1)
+            end;
         Error ->
             ?WARNING("Return error: ~p", [Error]),
             Data1 = io_lib:format("telnet send cmd error, cmd: ~p, reason:~p", [Cmd, Error]),
-            AllData = string:join(lists:reverse([Data1|Acc]), "\n"),
+            AllData = string:join(lists:reverse([Data1|Acc]), ?splite),
             {ok, AllData}
     end.
 

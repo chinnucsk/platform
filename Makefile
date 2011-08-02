@@ -13,12 +13,16 @@ all:
 	(cd errdb;$(MAKE))
 	#mkdir -p exmpp/ebin exmpp/doc
 	#(cd exmpp;$(MAKE))
+	#mkdir -p emongo/ebin emongo/doc
+	#(cd emongo;$(MAKE))
 	mkdir -p iconv/ebin iconv/doc
 	(cd iconv;$(MAKE))
 	mkdir -p mysql/ebin mysql/doc
 	(cd mysql;$(MAKE))
 	mkdir -p sesnmp/ebin sesnmp/doc
 	(cd sesnmp;$(MAKE))
+	mkdir -p telnet/ebin telnet/doc
+	(cd telnet;$(MAKE))
 
 clean:
 	(cd amqp;$(MAKE) clean)

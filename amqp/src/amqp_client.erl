@@ -9,6 +9,9 @@ start(Name, Opts, Succ, Fail) ->
     {ok, Pid} ->
         Succ(Pid),
         {ok, Pid};
+    {error, {already_started, Pid}} ->
+        Succ(Pid),
+        {ok, Pid};
     {error, Error} ->
         Fail(Error),
         {ok, undefined}
