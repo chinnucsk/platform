@@ -9,7 +9,8 @@
 %%%----------------------------------------------------------------------
 -module(extbif).
 
--export([datetime/0,
+-export([appvsn/0,
+        datetime/0,
         datetime/1,
         timestamp/0, 
         strftime/0,
@@ -22,8 +23,16 @@
         binary_to_atom/1, 
         atom_to_binary/1,
         binary_split/2,
+		binary_join/2,
         to_integer/1,
         zeropad/1]).
+
+appvsn() ->
+    {ok, App} = application:get_application(),
+    case application:get_key(App, vsn) of
+    {ok, Vsn} -> Vsn;
+    undefined -> "unknown"
+    end.
 
 timestamp() ->
 	{MegaSecs, Secs, _MicroSecs} = erlang:now(),
@@ -122,6 +131,17 @@ binary_split(<<C1, Rest/binary>>, C, Acc, Tokens) ->
 binary_split(<<>>, _C, Acc, Tokens) ->
     lists:reverse([Acc | Tokens]).
 
+binary_join([], _Sep) ->
+	<<>>;
+binary_join(List, Sep) when is_list(Sep) ->
+	binary_join(List, list_to_binary(Sep));
+
+binary_join([H|T], Sep) when is_binary(Sep) ->
+	Rest = lists:foldr(fun(E, Acc) -> 
+		<<Sep/binary, E/binary, Acc/binary>>
+	end, <<>>, T),
+	<<H/binary, Rest/binary>>.
+	
 zeropad(I) when I < 10 ->
     lists:concat(["0", I]);
 zeropad(I) ->

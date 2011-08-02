@@ -14,7 +14,7 @@
 
 -define(RETRIES, 2).
 
--define(TIMEOUT, 10000).
+-define(TIMEOUT, 20000).
 
 -define(MAX_LIMIT, 9999).
 
@@ -49,7 +49,7 @@ set(Addr, VarVals, AgentData) ->
 set(Addr, Port, VarVals, AgentData) ->
     {Names, VarsAndVals} = split_var_vals(VarVals),
     case retry(fun() -> sesnmp_client:set(Addr, Port, VarsAndVals, AgentData, ?TIMEOUT) end, ?RETRIES) of
-    {ok, {noError, 0, Varbinds}, _} ->
+    {ok, {noError, _, Varbinds}, _} ->
 		{ok, merge_vars(Names, Varbinds)}; %TODO
     {ok, Error, _} ->
         {error, Error};
@@ -88,7 +88,7 @@ get_table(Addr, Port, Col1Oid, Columns, AgentData, TIMEOUT, Acc) ->
     false ->
         {Names, Oids} = split_vars(Columns),
         case retry(fun() -> sesnmp_client:get_next(Addr, Port, Oids, AgentData, TIMEOUT) end, ?RETRIES) of
-        {ok, {noError, 0, Varbinds}, _} -> 
+        {ok, {noError, _, Varbinds}, _} -> 
             #varbind{oid=Oid} = lists:nth(1, Varbinds),
             case start_with_oid(Col1Oid, Oid) of
             true ->
@@ -115,7 +115,7 @@ get_entry(Addr, Port, Columns, Indices, AgentData) ->
 	{Names, Oids} = split_vars(Columns),
 	Oids1 = [lists:append(Oid, Indices) || Oid <- Oids],
     case retry(fun() -> sesnmp_client:get(Addr, Port, Oids1, AgentData, ?TIMEOUT) end, ?RETRIES) of
-	{ok, {noError, 0, Varbinds}, _} -> 
+	{ok, {noError, _, Varbinds}, _} -> 
 		{ok, merge_vars(Names, Varbinds)};
     {ok, Error, _} ->
         {error, Error};

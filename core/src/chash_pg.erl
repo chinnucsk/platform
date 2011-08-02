@@ -15,6 +15,7 @@
          get_local_vnodes/1, 
          get_vnodes/1, 
          get_vnode/2,
+         get_pids/1,
          get_pid/2]).
 
 -export([start/0, start_link/0]).
@@ -29,7 +30,7 @@
 
 -record(state, {links = []}).
 
--define(VNODES_NUM, 80).
+-define(VNODES_NUM, 40).
 
 %%%-----------------------------------------------------------------
 %%% This module implements distributed process groups based on consistent 
@@ -136,6 +137,11 @@ get_vnode(Name, Key) ->
             H
         end
     end.
+
+get_pids(Name) ->
+    VNodes = get_vnodes(Name),
+    Pids = [Pid || {_, Pid, _} <- VNodes], 
+    lists:usort(Pids).
 
 get_pid(Name, Key) ->
     case get_vnode(Name, extbif:to_list(Key)) of

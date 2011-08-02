@@ -324,6 +324,7 @@ handle_snmp_pdu(#pdu{type = 'get-response', request_id = ReqId} = Pdu,
 	    delete_req(ReqId),
 	    ok;
 	_ ->
+        ?ERROR("delay get-response: ~p", [ReqId]),
         ok
 	end;
 
@@ -469,7 +470,7 @@ maybe_demonitor(MonRef) ->
 
 %%----------------------------------------------------------------------
 call(Req) ->
-    gen_server:call(pg2:get_closest_pid(sesnmp_client), Req, 15000).
+    gen_server:call(pg2:get_closest_pid(sesnmp_client), Req, 40000).
 
 call(Req, Timeout) ->
     gen_server:call(pg2:get_closest_pid(sesnmp_client), Req, Timeout).

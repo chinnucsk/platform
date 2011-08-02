@@ -196,8 +196,10 @@ eval({'!=', Name, Val}, Args) ->
     not (ArgVal == Val);
 
 eval({'=', Name, Val}, Args) ->
-    {value, {_, ArgVal}} = keysearch(Name, 1, Args),
-    ArgVal == Val;
+     case keysearch(Name, 1, Args) of
+     {value, {_, ArgVal}} -> ArgVal == Val;
+     false -> false
+     end;
 
 eval({'>=', Name, Val}, Args) ->
     {value, {_, ArgVal}} = keysearch(Name, 1, Args),

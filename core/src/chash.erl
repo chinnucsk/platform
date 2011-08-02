@@ -13,7 +13,7 @@
 
 %% @doc hash
 hash(String) when is_list(String) ->
-    <<Hash:160>> = sha1:binstring(String),
+    <<Hash:160>> = crypto:sha(String), %sha1:binstring(String),
     Hash.
 
 max() ->
