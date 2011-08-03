@@ -1,0 +1,9 @@
+amqp/ebin/*.beam
+cassandra/ebin/*.beam
+core/ebin/*.beam
+elog/ebin/*.beam
+errdb/ebin/*.beam
+mochiweb/ebin/*.beam
+mysql/ebin/*.beam
+sesnmp/ebin/*.beam
+
