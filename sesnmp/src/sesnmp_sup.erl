@@ -10,6 +10,7 @@
 start_link(Opts) ->
     supervisor:start_link({local, ?MODULE}, ?MODULE, [Opts]).
 
+
 init([Opts]) ->
     Server = {sesnmp_server, {sesnmp_server, start_link, []},
 	      permanent, 10, worker, [sesnmp_server]},
@@ -25,4 +26,3 @@ init([Opts]) ->
         Sups ++ [Trapd]
     end,
 	{ok, {{one_for_all, 1, 10}, Sups1}}.
-
