@@ -185,11 +185,11 @@ eval({'!', SubExp} = _Exp, Args) when is_tuple(SubExp) ->
 
 eval({'>', Name, Val}, Args) ->
     {value, {_, ArgVal}} = keysearch(Name, 1, Args),
-    ArgVal > Val;
+    ArgVal > to_integer(Val);
 
 eval({'<', Name, Val}, Args) ->
     {value, {_, ArgVal}} = keysearch(Name, 1, Args),
-    ArgVal < Val;
+    ArgVal < to_integer(Val);
 
 eval({'!=', Name, Val}, Args) ->
     {value, {_, ArgVal}} = keysearch(Name, 1, Args),
@@ -203,11 +203,11 @@ eval({'=', Name, Val}, Args) ->
 
 eval({'>=', Name, Val}, Args) ->
     {value, {_, ArgVal}} = keysearch(Name, 1, Args),
-    ArgVal >= Val;
+    ArgVal >= to_integer(Val);
 
 eval({'<=', Name, Val}, Args) ->
     {value, {_, ArgVal}} = keysearch(Name, 1, Args),
-    ArgVal =< Val.
+    ArgVal =< to_integer(Val).
 
 eval_or([], _Args) ->
     false;
