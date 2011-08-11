@@ -7,3 +7,4 @@ mochiweb/ebin/*.beam
 sesnmp/ebin/*.beam
 mysql/ebin/*.beam
 esyslog/ebin/*
+telnet/ebin/*
