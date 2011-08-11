@@ -16,6 +16,8 @@
 -behavior(gen_server).
 
 -export([start_link/1,
+        set_severity/1,
+        get_severity/0,
         error/4, 
         warn/4,
         info/4,
@@ -71,6 +73,13 @@
 start_link(Opts) ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [Opts], []).
 
+get_severity() ->
+    [{_, Severity}] = ets:lookup(esyslog, severity),
+    severity(Severity).
+
+set_severity(Severity) ->
+    gen_server:call(?MODULE, {set_severity, severity(Severity)}).
+
 error(Mod, Line, Format, Args) ->
     syslog(?LOG_ERROR, Mod, Line, Format, Args).
 
@@ -106,7 +115,7 @@ init([Opts]) ->
     Port = get_value(port, Opts, 514),
     Severity = get_value(severity, Opts, error),
     ets:new(esyslog, [set, protected, named_table]),
-    ets:insert(esyslog, {severity, Severity}),
+    ets:insert(esyslog, {severity, severity(Severity)}),
 	case gen_udp:open(0) of
     {ok, Fd} ->
         {ok, #state{fd=Fd, host=Host, port=Port}};
@@ -123,6 +132,10 @@ init([Opts]) ->
 %%                                      {stop, Reason, State}
 %% Description: Handling call messages
 %%--------------------------------------------------------------------
+handle_call({set_severity, Severity}, _From, State) ->
+    ets:insert(esyslog, {severity, Severity}),
+    {reply, ok, State};
+
 handle_call(stop, _From, State) ->
     {stop, normal, ok, State};
 
