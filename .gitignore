@@ -1,4 +1,5 @@
 amqp/ebin/*.beam
+cassandra/ebin/*.beam
 core/ebin/*.beam
 elog/ebin/*.beam
 errdb/ebin/*.beam

@@ -82,7 +82,7 @@ get_bulk(Addr0, Port, NonRep, MaxRep, Oids, AgentData, Timeout) ->
     {ok, Addr} -> 
         call({sync_get_bulk, self(), Addr, Port, NonRep, MaxRep, Oids, AgentData, Timeout});
     {error, Error} ->
-        {error,Error}
+        {error, Error}
     end.
 
 set(Addr0, VarsAndVals, AgentData, Timeout) ->

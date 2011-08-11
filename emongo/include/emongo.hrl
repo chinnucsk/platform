@@ -10,7 +10,7 @@
          }).
 -record(emo_query, {opts=[], offset=0, limit=0, q=[], field_selector=[]}).
 
--define(TIMEOUT, 5000).
+-define(TIMEOUT, 30000).
 
 -define(OP_REPLY, 1).
 -define(OP_MSG, 1000).

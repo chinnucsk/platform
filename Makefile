@@ -1,7 +1,7 @@
 all:
 	mkdir -p elog/ebin elog/doc
 	(cd elog;$(MAKE))
-	mkdir -p esyslog/ebin 
+	mkdir -p esyslog/ebin esyslog/doc
 	(cd esyslog;$(MAKE))
 	mkdir -p core/ebin core/doc
 	(cd core;$(MAKE))
@@ -15,13 +15,15 @@ all:
 	(cd errdb;$(MAKE))
 	#mkdir -p exmpp/ebin exmpp/doc
 	#(cd exmpp;$(MAKE))
-	(cd emongo;$(MAKE))
+	#mkdir -p emongo/ebin emongo/doc
+	#(cd emongo;$(MAKE))
 	mkdir -p iconv/ebin iconv/doc
 	(cd iconv;$(MAKE))
 	mkdir -p mysql/ebin mysql/doc
 	(cd mysql;$(MAKE))
 	mkdir -p sesnmp/ebin sesnmp/doc
 	(cd sesnmp;$(MAKE))
+	mkdir -p telnet/ebin telnet/doc
 	(cd telnet;$(MAKE))
 
 clean:
@@ -32,10 +34,7 @@ clean:
 	(cd esyslog;$(MAKE) clean)
 	(cd errdb;$(MAKE) clean)
 	#(cd exmpp;$(MAKE) clean)
-	(cd emongo;$(MAKE) clean)
 	(cd iconv;$(MAKE) clean)
 	(cd mochiweb;$(MAKE) clean)
 	(cd mysql;$(MAKE) clean)
 	(cd sesnmp;$(MAKE) clean)
-	(cd telnet;$(MAKE) clean)
-

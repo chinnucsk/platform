@@ -81,10 +81,10 @@ open(Server, Port, Timeout, KeepAlive) ->
     Self = self(),
     Pid = spawn(fun() -> init(Self, Server, Port, Timeout, KeepAlive) end),
     receive 
-	{open,Pid} ->
-	    {ok,Pid};
-	{Error,Pid} ->
-	    Error
+        {open,Pid} ->
+            {ok,Pid};
+        {Error,Pid} ->
+            Error
     end.
 
 close(Pid) ->
@@ -97,8 +97,8 @@ send_data(Pid, Data) ->
 get_data(Pid) ->
     Pid ! {get_data, self()},
     receive 
-	{data,Data} ->
-	    {ok, Data}
+        {data,Data} ->
+            {ok, Data}
     end.
 
 
@@ -106,80 +106,80 @@ get_data(Pid) ->
 %%% Internal functions
 init(Parent, Server, Port, Timeout, KeepAlive) ->
     case gen_tcp:connect(Server, Port, [list,{packet,0}], Timeout) of
-	{ok,Sock} ->
-	    ?INFO("Connected to: ~p (port: ~w, keep_alive: ~w)\n", [Server,Port,KeepAlive]),
-	    send([?IAC,?DO,?SUPPRESS_GO_AHEAD], Sock),	      
-	    Parent ! {open,self()},
-	    loop(#state{get_data=10, keep_alive=KeepAlive}, Sock, []),
-	    gen_tcp:close(Sock);
-     Error ->
-	    Parent ! {Error,self()}
+        {ok,Sock} ->
+            ?INFO("Connected to: ~p (port: ~w, keep_alive: ~w)\n", [Server,Port,KeepAlive]),
+            send([?IAC,?DO,?SUPPRESS_GO_AHEAD], Sock),
+            Parent ! {open,self()},
+            loop(#state{get_data=10, keep_alive=KeepAlive}, Sock, []),
+            gen_tcp:close(Sock);
+        Error ->
+            Parent ! {Error,self()}
     end.
 
 loop(State, Sock, Acc) ->
     receive
-	{tcp_closed,_} ->
-	    ?INFO("Connection closed\n", []),
-	    receive
-		{get_data,Pid} ->
-		    Pid ! closed
-	    after 100 ->
-		    ok
-	    end;
-	{tcp,_,Msg0} ->
-	    ?INFO("tcp msg: ~p~n",[Msg0]),
-	    Msg = check_msg(Sock,Msg0,[]),
-	    loop(State, Sock, [Msg | Acc]);
-	{send_data,Data} ->
-	    send(Data, Sock),
-	    loop(State, Sock, Acc);
-	{get_data,Pid} ->
-	    NewState = 
-		case Acc of
-		    [] ->
-			?INFO("get_data nodata\n",[]),
-			erlang:send_after(100,self(),{get_data_delayed,Pid}),
-			if State#state.keep_alive == true ->
-				State#state{get_data=State#state.get_data - 1};
-			   State#state.keep_alive == false ->
-				State
-			end;
-		    _ ->
-			Pid ! {data,lists:reverse(lists:append(Acc))},
-			State
-		end,
-	    loop(NewState, Sock, []);
-	{get_data_delayed,Pid} ->
-	    NewState =
-		case State of
-		    #state{keep_alive = true, get_data = 0} ->
-			if Acc == [] -> send([?IAC,?NOP], Sock);
-			   true -> ok
-			end,
-			State#state{get_data=10};
-		    _ ->
-			State
-		end,
-        ?INFO("get_data_delayed,acc: ~p",[Acc]),
-	    NewAcc = 
-		case erlang:is_process_alive(Pid) of
-		    true ->
-			Pid ! {data,lists:reverse(lists:append(Acc))},
-			[];
-		    false ->
-			Acc
-		end,
-	    loop(NewState, Sock, NewAcc);			       
-	close ->
-	    ?INFO("Closing connection\n", []),
-	    gen_tcp:close(Sock),
-	    ok
+        {tcp_closed,_} ->
+            ?INFO("Connection closed\n", []),
+            receive
+                {get_data,Pid} ->
+                    Pid ! closed
+            after 100 ->
+                    ok
+            end;
+        {tcp,_,Msg0} ->
+            ?INFO("tcp msg: ~p~n",[Msg0]),
+            Msg = check_msg(Sock,Msg0,[]),
+            loop(State, Sock, [Msg | Acc]);
+        {send_data,Data} ->
+            send(Data, Sock),
+            loop(State, Sock, Acc);
+        {get_data,Pid} ->
+            NewState =
+                case Acc of
+                    [] ->
+                        ?INFO("get_data nodata\n",[]),
+                        erlang:send_after(100,self(),{get_data_delayed,Pid}),
+                        if State#state.keep_alive == true ->
+                                State#state{get_data=State#state.get_data - 1};
+                            State#state.keep_alive == false ->
+                                State
+                        end;
+                    _ ->
+                        Pid ! {data,lists:reverse(lists:append(Acc))},
+                        State
+                end,
+            loop(NewState, Sock, []);
+        {get_data_delayed,Pid} ->
+            NewState =
+                case State of
+                    #state{keep_alive = true, get_data = 0} ->
+                        if Acc == [] -> send([?IAC,?NOP], Sock);
+                            true -> ok
+                        end,
+                        State#state{get_data=10};
+                    _ ->
+                        State
+                end,
+            ?INFO("get_data_delayed,acc: ~p",[Acc]),
+            NewAcc =
+                case erlang:is_process_alive(Pid) of
+                    true ->
+                        Pid ! {data,lists:reverse(lists:append(Acc))},
+                        [];
+                    false ->
+                        Acc
+                end,
+            loop(NewState, Sock, NewAcc);
+        close ->
+            ?INFO("Closing connection\n", []),
+            gen_tcp:close(Sock),
+            ok
     after wait(State#state.keep_alive,?IDLE_TIMEOUT) ->
-	    if 
-		Acc == [] -> send([?IAC,?NOP], Sock);
-		true -> ok
-	    end,
-	    loop(State, Sock, Acc)
+            if
+                Acc == [] -> send([?IAC,?NOP], Sock);
+                true -> ok
+            end,
+            loop(State, Sock, Acc)
     end.
 
 wait(true, Time) -> Time;
@@ -187,10 +187,10 @@ wait(false, _) -> infinity.
 
 send(Data, Sock) ->
     case Data of
-	[?IAC|_] = Cmd ->
-	    cmd_dbg(Cmd);
-	_ ->
-	    ?INFO("Sending: ~p\n", [Data])
+        [?IAC|_] = Cmd ->
+            cmd_dbg(Cmd);
+        _ ->
+            ?INFO("Sending: ~p\n", [Data])
     end,
     gen_tcp:send(Sock, Data),
     ok.
@@ -204,13 +204,13 @@ check_msg(Sock, [?IAC,?IAC | T], Acc) ->
 check_msg(Sock, [?IAC | Cs], Acc) ->
     ?INFO("get command :~p", [Cs]),
     case get_cmd(Cs) of
-	{Cmd,Cs1} ->
-	    ?INFO("Got ", []),
-	    cmd_dbg(Cmd),
-	    respond_cmd(Cmd, Sock),
-	    check_msg(Sock, Cs1, Acc); 
-	error ->
-	    Acc
+        {Cmd,Cs1} ->
+            ?INFO("Got ", []),
+            cmd_dbg(Cmd),
+            respond_cmd(Cmd, Sock),
+            check_msg(Sock, Cs1, Acc);
+        error ->
+            Acc
     end;
 
 %% buffer a data value
@@ -296,26 +296,26 @@ dbg(_Str,_Args) ->
 
 cmd_dbg(_Cmd) ->
     case _Cmd of
-	[?IAC|Cmd1] ->
-	    cmd_dbg(Cmd1);
-	[Ctrl|Opts] ->
-	    CtrlStr =
-		case Ctrl of
-		    ?DO ->   "DO";
-		    ?DONT -> "DONT";
-		    ?WILL -> "WILL";
-		    ?WONT -> "WONT";
-		    ?NOP ->  "NOP";
-		    _ ->     "CMD"
-		end,
-	    Opts1 =
-		case Opts of
-		    [Opt] -> Opt;
-		    _ -> Opts
-		end,
-	    ?INFO("~s(~w): ~w\n", [CtrlStr,Ctrl,Opts1]);
-	Any  ->
-	    ?INFO("Unexpected in cmd_dbg:~n~w~n",[Any])
+        [?IAC|Cmd1] ->
+            cmd_dbg(Cmd1);
+        [Ctrl|Opts] ->
+            CtrlStr =
+                case Ctrl of
+                    ?DO ->   "DO";
+                    ?DONT -> "DONT";
+                    ?WILL -> "WILL";
+                    ?WONT -> "WONT";
+                    ?NOP ->  "NOP";
+                    _ ->     "CMD"
+                end,
+            Opts1 =
+                case Opts of
+                    [Opt] -> Opt;
+                    _ -> Opts
+                end,
+            ?INFO("~s(~w): ~w\n", [CtrlStr,Ctrl,Opts1]);
+        Any  ->
+            ?INFO("Unexpected in cmd_dbg:~n~w~n",[Any])
     end.
 
 -else.

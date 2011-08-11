@@ -84,6 +84,7 @@ to_list(L) when is_float(L) ->
 to_list(B) when is_binary(B) ->
     binary_to_list(B).
 
+
 to_binary(A) when is_atom(A) ->
     list_to_binary(atom_to_list(A));
 to_binary(B) when is_binary(B) ->
