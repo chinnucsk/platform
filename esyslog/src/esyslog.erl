@@ -18,13 +18,16 @@
 -export([start_link/1,
         set_severity/1,
         get_severity/0,
+		crit/4,
         error/4, 
         warn/4,
         info/4,
+		debug/4,
         stop/0]).
 
 -export([init/1,
         handle_call/3,
+        priorities_call/3,
         handle_cast/2,
         handle_info/2,
         terminate/2,
@@ -71,14 +74,17 @@
 %% Description: Starts the server
 %%--------------------------------------------------------------------
 start_link(Opts) ->
-    gen_server:start_link({local, ?MODULE}, ?MODULE, [Opts], []).
+    gen_server2:start_link({local, ?MODULE}, ?MODULE, [Opts], []).
 
 get_severity() ->
     [{_, Severity}] = ets:lookup(esyslog, severity),
     severity(Severity).
 
 set_severity(Severity) ->
-    gen_server:call(?MODULE, {set_severity, severity(Severity)}).
+    gen_server2:call(?MODULE, {set_severity, severity(Severity)}).
+
+crit(Mod, Line, Format, Args) ->
+    syslog(?LOG_CRITICAL, Mod, Line, Format, Args).
 
 error(Mod, Line, Format, Args) ->
     syslog(?LOG_ERROR, Mod, Line, Format, Args).
@@ -89,19 +95,22 @@ warn(Mod, Line, Format, Args) ->
 info(Mod, Line, Format, Args) ->
     syslog(?LOG_INFO, Mod, Line, Format, Args).
 
+debug(Mod, Line, Format, Args) ->
+    syslog(?LOG_DEBUG, Mod, Line, Format, Args).
+
 syslog(Severity, Mod, Line, Format, Args) ->
     [{_, Threshold}] = ets:lookup(esyslog, severity),
     if 
     Threshold >= Severity ->
         Syslog = #syslog{severity = Severity, module = Mod, 
             line = Line, pid = self(), format = Format, args = Args},
-        gen_server:cast(?MODULE, {syslog, Syslog});
+        gen_server2:cast(?MODULE, {syslog, Syslog});
     true ->
         ignore
     end.
 
 stop() ->
-    gen_server:call(?MODULE, stop).
+    gen_server2:call(?MODULE, stop).
 
 %%--------------------------------------------------------------------
 %% Function: init(Args) -> {ok, State} |
@@ -142,6 +151,13 @@ handle_call(stop, _From, State) ->
 handle_call(Req, _From, State) ->
     ?ERROR("badreq: ~p", [Req]),
     {reply, {error, badreq}, State}.
+
+priorities_call(stop, _From, _State) ->
+    10;
+priorities_call({set_severity, _}, _From, _State) ->
+    9;
+priorities_call(_, _From, _State) ->
+    0.
 %%--------------------------------------------------------------------
 %% Function: handle_cast(Msg, State) -> {noreply, State} |
 %%                                      {noreply, State, Timeout} |
@@ -157,7 +173,6 @@ handle_cast({syslog, #syslog{facility = Facility, severity = Severity,
     Tag = io_lib:format("[~p/~p/~p/~p].~p", [node(),Mod,Pid,Line,severity(Severity)]),
     Msg = io_lib:format(Format, Args),
     Pkt = list_to_binary(["<", Pri, ">", Head, " ", Tag, ": ", Msg, "\n"]),
-    io:format("~p~n", [Pkt]),
 	gen_udp:send(Fd, Host, Port, Pkt),
     {noreply, State};
 
