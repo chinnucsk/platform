@@ -16,22 +16,17 @@
     io:format(Format, Args)).
 
 -define(DEBUG(Format, Args),
-    elog_logger:debug_msg(?MODULE,?LINE,Format, Args),
-	esyslog:debug(?MODULE, ?LINE, Format, Args)).
+    elog_logger:debug_msg(?MODULE,?LINE,Format, Args)).
 
 -define(INFO(Format, Args),
-    elog_logger:info_msg(?MODULE,?LINE,Format, Args),
-	esyslog:info(?MODULE, ?LINE, Format, Args)).
+    elog_logger:info_msg(?MODULE,?LINE,Format, Args)).
 			      
 -define(WARNING(Format, Args),
-    elog_logger:warning_msg(?MODULE,?LINE,Format, Args),
-	esyslog:warn(?MODULE, ?LINE, Format, Args)).
+    elog_logger:warning_msg(?MODULE,?LINE,Format, Args)).
 			      
 -define(ERROR(Format, Args),
-    elog_logger:error_msg(?MODULE,?LINE,Format, Args),
-	esyslog:error(?MODULE, ?LINE, Format, Args)).
+    elog_logger:error_msg(?MODULE,?LINE,Format, Args)).
 
 -define(CRITICAL(Format, Args),
-    elog_logger:critical_msg(?MODULE,?LINE,Format, Args),
-	esyslog:crit(?MODULE, ?LINE, Format, Args)).
+    elog_logger:critical_msg(?MODULE,?LINE,Format, Args)).
 
