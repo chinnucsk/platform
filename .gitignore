@@ -6,4 +6,7 @@ errdb/ebin/*.beam
 mochiweb/ebin/*.beam
 sesnmp/ebin/*.beam
 mysql/ebin/*.beam
-esyslog/ebin/*
+esyslog/ebin/*.beam
+telnet/ebin/*.beam
+exmpp.local/*
+eredis/ebin/*.beam
