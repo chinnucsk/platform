@@ -1,6 +1,6 @@
--module(olt_telnet).
+-module(olt_huawei_telnet).
 
--author("hejin-2011-5-16").
+-author("hejin 2011-8-17").
 
 -export([start/1,
         get_data/2,
@@ -12,9 +12,9 @@
 -define(CONN_TIMEOUT, 10000).
 -define(CMD_TIMEOUT, 3000).
 
--define(username,"Username:").
--define(password,"Password:").
--define(prx,"Username:|Password:|\\\-3#|> |--More--").
+-define(username,"User name:").
+-define(password,"User password:").
+-define(prx,"User name:|User password:|5680T#|> |-- More ").
 
 -define(keepalive, true).
 
@@ -60,8 +60,8 @@ init(Opts) ->
     io:format("starting telnet conn ...~p",[Opts]),
     Host = proplists:get_value(host, Opts, "localhost"),
     Port = proplists:get_value(port, Opts, 23),
-    Username = proplists:get_value(username, Opts, "root"),
-    Password = proplists:get_value(password, Opts, "public"),
+    Username = proplists:get_value(username, Opts),
+    Password = proplists:get_value(password, Opts),
     case (catch connect(Host, Port, ?CONN_TIMEOUT, ?keepalive, Username, Password)) of
 	{ok, Pid} ->
 	    {ok, Pid};
@@ -88,9 +88,9 @@ connect(Ip,Port,Timeout,KeepAlive,Username,Password) ->
                                 ok = telnet_client:send_data(Pid,""),
                                 case telnet:silent_teln_expect(Pid,[],prompt,
                                                   ?prx,[]) of
-                                    {ok,{prompt,Prompt},_}
+                                    {ok,{prompt,Prompt},Rest}
                                     when Prompt=/=?username, Prompt=/=?password ->
-                                        ?INFO("get data over.............", []),
+                                        ?INFO("get data over.....propmpt:~p,~p", [Prompt, Rest]),
                                         {ok,Pid};
                                     Error ->
                                     ?WARNING("Password failed\n~p\n",
@@ -112,3 +112,4 @@ connect(Ip,Port,Timeout,KeepAlive,Username,Password) ->
                     {error, Error}
 	end,
     Result.
+
