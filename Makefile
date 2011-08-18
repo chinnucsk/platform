@@ -1,6 +1,8 @@
 all:
 	mkdir -p elog/ebin elog/doc
 	(cd elog;$(MAKE))
+	mkdir -p esyslog/ebin esyslog/doc
+	(cd esyslog;$(MAKE))
 	mkdir -p core/ebin core/doc
 	(cd core;$(MAKE))
 	mkdir -p amqp/ebin amqp/doc
@@ -29,10 +31,10 @@ clean:
 	(cd cassandra;$(MAKE) clean)
 	(cd core;$(MAKE) clean)
 	(cd elog;$(MAKE) clean)
+	(cd esyslog;$(MAKE) clean)
 	(cd errdb;$(MAKE) clean)
 	#(cd exmpp;$(MAKE) clean)
 	(cd iconv;$(MAKE) clean)
 	(cd mochiweb;$(MAKE) clean)
 	(cd mysql;$(MAKE) clean)
 	(cd sesnmp;$(MAKE) clean)
-
