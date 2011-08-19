@@ -3,8 +3,8 @@
 -author("hejin-2011-5-16").
 
 -export([start/1,
-        get_data/1, get_data/2,
-        close/1
+        get_data/2, get_data/3,
+        close/2
         ]).
 
 -include("elog.hrl").
@@ -14,7 +14,9 @@
 
 -define(username,"Username:").
 -define(password,"Password:").
--define(prx,"Username:|Password:|\\\-3#|> |--More--").
+-define(termchar, "#$").
+-define(page, "--More--").
+-define(prx,"Username:|Password:|--More--").
 
 -define(keepalive, true).
 
@@ -23,19 +25,20 @@
 start(Opts) ->
     init(Opts).
 
-get_data(Pid) ->
-    get_data(Pid, "show running-config").
+get_data(Pid, Head) ->
+    get_data(Pid, "show running-config", Head).
 
-get_data(Pid, Cmd) ->
-    get_data(Pid, Cmd, [], []).
+get_data(Pid, Cmd, Head) ->
+    get_data(Pid, Cmd, Head, [], []).
 
-get_data(Pid, Cmd, Acc, LastLine) ->
-    case telnet_gen_conn:teln_cmd(Pid, Cmd, ?prx, ?CMD_TIMEOUT) of
-        {ok, Data, "--More--",Rest} ->
+get_data(Pid, Cmd, Head, Acc, LastLine) ->
+    NewPrx = ?prx ++ "|" ++ Head,
+    case telnet_gen_conn:teln_cmd(Pid, Cmd, NewPrx, ?CMD_TIMEOUT) of
+        {ok, Data, ?page, Rest} ->
             Lastline1 = string:strip(lists:last(Data)),
             ?INFO("more: ~p, lastline: ~p, ~n, Rest : ~p", [Data, Lastline1, Rest]),
             Data1 =  string:join(Data, ?splite),
-            get_data(Pid, " ", [Data1|Acc], Lastline1);
+            get_data(Pid, " ", Head, [Data1|Acc], Lastline1);
         {ok, Data, PromptType, Rest} ->
             ?INFO("Return: ~p, PromptType : ~p, ~n, Rest :~p", [Data, PromptType, Rest]),
             Data1 =  string:join(Data, ?splite),
@@ -47,7 +50,7 @@ get_data(Pid, Cmd, Acc, LastLine) ->
                     {ok, AllData};
                 _ ->
                     Data2 = Data1 ++ PromptType ++ Rest,
-                    get_data(Pid, " ", [Data2|Acc], Lastline1)
+                    get_data(Pid, " ", Head, [Data2|Acc], Lastline1)
             end;
         Error ->
             ?WARNING("Return error: ~p", [Error]),
@@ -56,7 +59,8 @@ get_data(Pid, Cmd, Acc, LastLine) ->
             {ok, AllData}
     end.
 
-close(Pid) ->
+close(Pid, Head) ->
+    get_data(Pid, "quit", Head),
     telnet_client:close(Pid).
 
 init(Opts) ->
@@ -85,27 +89,32 @@ connect(Ip,Port,Timeout,KeepAlive,Username,Password) ->
                             ?INFO("Username: ~s",[Username]),
                             case telnet:silent_teln_expect(Pid,[],prompt,?prx,[]) of
                                 {ok,{prompt,?password},_} ->
-                                ok = telnet_client:send_data(Pid,Password),
-    %                            Stars = lists:duplicate(length(Password),$*),
-                                ?INFO("Password: ~s",[Password]),
-                                ok = telnet_client:send_data(Pid,""),
-                                case telnet:silent_teln_expect(Pid,[],prompt,
-                                                  ?prx,[]) of
-                                    {ok,{prompt,Prompt},Rest}
-                                    when Prompt=/=?username, Prompt=/=?password ->
-                                        ?INFO("get data over.....propmpt:~p,~p", [Prompt, Rest]),
-                                        {ok,Pid};
-                                    Error ->
-                                    ?WARNING("Password failed\n~p\n",
-                                         [Error]),
-                                    {error,Error}
-                                end;
+                                    ok = telnet_client:send_data(Pid,Password),
+%                                   Stars = lists:duplicate(length(Password),$*),
+                                    ?INFO("Password: ~s",[Password]),
+%                                   ok = telnet_client:send_data(Pid,""),
+                                    case telnet:silent_teln_expect(Pid,[],prompt,
+                                                                   ?termchar,[]) of
+                                        {ok,{prompt,Prompt},Rest}  ->
+                                            ?INFO("get login over.....propmpt:~p,~p", [Prompt, Rest]),
+                                            case telnet_gen_conn:teln_cmd(Pid, "", ?termchar, ?CMD_TIMEOUT) of
+                                                {ok, Data, PromptType, Rest} ->
+                                                    ?INFO("get head data .....propmpt:~p,~p", [Data, PromptType]),
+                                                    {ok, Pid, string:join(lists:reverse(Data), "")};
+                                                Error ->
+                                                    {error,Error}
+                                            end;
+                                        Error ->
+                                            ?WARNING("Password failed\n~p\n",
+                                                     [Error]),
+                                            {error,Error}
+                                    end;
                                 Error ->
-                                ?WARNING("Login failed\n~p\n",[Error]),
-                                {error,Error}
+                                    ?WARNING("Login failed\n~p\n",[Error]),
+                                    {error,Error}
                             end;
-                            {ok,[{prompt,_OtherPrompt1},{prompt,_OtherPrompt2}],_} ->
-                            {ok,Pid};
+                        {ok,[{prompt,_OtherPrompt1},{prompt,_OtherPrompt2}],_} ->
+                            {ok,Pid, "$"};
                         Error ->
                             ?WARNING("Did not get expected prompt\n~p\n",[Error]),
                             {error,Error}
@@ -113,5 +122,5 @@ connect(Ip,Port,Timeout,KeepAlive,Username,Password) ->
                 Error ->
                     ?WARNING("Could not open telnet connection\n~p\n",[Error]),
                     {error, Error}
-	end,
+            end,
     Result.
