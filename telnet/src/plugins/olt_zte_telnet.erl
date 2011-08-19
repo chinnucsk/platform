@@ -3,7 +3,7 @@
 -author("hejin-2011-5-16").
 
 -export([start/1,
-        get_data/2,
+        get_data/1, get_data/2,
         close/1
         ]).
 
@@ -22,6 +22,9 @@
 
 start(Opts) ->
     init(Opts).
+
+get_data(Pid) ->
+    get_data(Pid, "show running-config").
 
 get_data(Pid, Cmd) ->
     get_data(Pid, Cmd, [], []).
