@@ -28,8 +28,11 @@ start(Opts) ->
 %flow
 get_data(Pid, Head) ->
     get_data(Pid, "enable", Head),
-    get_data(Pid, "display current-configuration", Head),
-    get_data(Pid, "", Head).
+    {ok, Data1} = get_data(Pid, "display current-configuration", Head),
+    ?INFO("get data1 :~p", [Data1]),
+    {ok, Data2} = get_data(Pid, "", Head),
+    ?INFO("get data2 :~p", [Data2]),
+    {ok, {Data1 ++ Data2}}.
 
 get_data(Pid, Cmd, Head) ->
     get_data(Pid, Cmd, Head, [], []).
@@ -46,16 +49,8 @@ get_data(Pid, Cmd, Head, Acc, LastLine) ->
         {ok, Data, PromptType, Rest} ->
             ?INFO("Return: ~p, PromptType : ~p, ~n, Rest :~p", [Data, PromptType, Rest]),
             Data1 =  string:join(Data, ?splite),
-            Lastline1 = string:strip(lists:last(Data)),
-            case  Lastline1 of
-                LastLine ->
-                    ?INFO("get end Lastline  ~p, ~n, acc :~p", [Lastline1, Acc]),
-                    AllData = string:join(lists:reverse([Data1|Acc]), ?splite),
-                    {ok, AllData};
-                _ ->
-                    Data2 = Data1 ++ PromptType ++ Rest,
-                    get_data(Pid, " ", Head, [Data2|Acc], Lastline1)
-            end;
+            AllData = string:join(lists:reverse([Data1|Acc]), ?splite),
+            {ok, AllData};
         Error ->
             ?WARNING("Return error: ~p", [Error]),
             Data1 = io_lib:format("telnet send cmd error, cmd: ~p, reason:~p", [Cmd, Error]),
