@@ -10,13 +10,14 @@
 -include("elog.hrl").
 
 -define(CONN_TIMEOUT, 10000).
--define(CMD_TIMEOUT, 3000).
+-define(CMD_TIMEOUT, 9000).
 
 -define(username, "User name:").
 -define(password, "User password:").
 -define(termchar, "#$|>$").
+-define(comfirm, "section<K>\\|").
 -define(page, "-- More ").
--define(prx,"User name:|User password:|#$|>$|-- More ").
+-define(prx, ?username ++ "|" ++ ?password ++ "|" ++ ?comfirm ++ "|" ++ ?page).
 
 -define(keepalive, true).
 
@@ -32,20 +33,20 @@ get_data(Pid, Head) ->
     ?INFO("get data1 :~p", [Data1]),
     {ok, Data2} = get_data(Pid, "", Head),
     ?INFO("get data2 :~p", [Data2]),
-    {ok, {Data1 ++ Data2}}.
+    {ok, Data1 ++ Data2}.
 
 get_data(Pid, Cmd, Head) ->
-    get_data(Pid, Cmd, Head, [], []).
+    get_data(Pid, Cmd, Head, []).
 
 
-get_data(Pid, Cmd, Head, Acc, LastLine) ->
-    NewPrx = ?prx ++ "|" ++ Head,
+get_data(Pid, Cmd, Head, Acc) ->
+    NewPrx = ?prx ++ "|" ++ Head ++ "#",
     case telnet_gen_conn:teln_cmd(Pid, Cmd, NewPrx, ?CMD_TIMEOUT) of
         {ok, Data, ?page, Rest} ->
             Lastline1 = string:strip(lists:last(Data)),
             ?INFO("more: ~p, lastline: ~p, ~n, Rest : ~p", [Data, Lastline1, Rest]),
             Data1 =  string:join(Data, ?splite),
-            get_data(Pid, " ", Head, [Data1|Acc], Lastline1);
+            get_data(Pid, " ", Head, [Data1|Acc]);
         {ok, Data, PromptType, Rest} ->
             ?INFO("Return: ~p, PromptType : ~p, ~n, Rest :~p", [Data, PromptType, Rest]),
             Data1 =  string:join(Data, ?splite),
@@ -59,6 +60,7 @@ get_data(Pid, Cmd, Head, Acc, LastLine) ->
     end.
 
 close(Pid, Head) ->
+    ?INFO("close telnet....~p",[Head]),
     get_data(Pid, "quit", Head),
     get_data(Pid, "y", Head),
     telnet_client:close(Pid).

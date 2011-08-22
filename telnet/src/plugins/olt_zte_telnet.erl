@@ -10,13 +10,13 @@
 -include("elog.hrl").
 
 -define(CONN_TIMEOUT, 10000).
--define(CMD_TIMEOUT, 3000).
+-define(CMD_TIMEOUT, 9000).
 
 -define(username,"Username:").
 -define(password,"Password:").
 -define(termchar, "#$").
 -define(page, "--More--").
--define(prx,"Username:|Password:|--More--").
+-define(prx, ?username ++ "|" ++ ?password ++ "|" ++ ?page).
 
 -define(keepalive, true).
 
@@ -32,7 +32,7 @@ get_data(Pid, Cmd, Head) ->
     get_data(Pid, Cmd, Head, [], []).
 
 get_data(Pid, Cmd, Head, Acc, LastLine) ->
-    NewPrx = ?prx ++ "|" ++ Head,
+    NewPrx = ?prx ++ "|" ++ Head ++ "#",
     case telnet_gen_conn:teln_cmd(Pid, Cmd, NewPrx, ?CMD_TIMEOUT) of
         {ok, Data, ?page, Rest} ->
             Lastline1 = string:strip(lists:last(Data)),
@@ -70,8 +70,8 @@ init(Opts) ->
     Username = proplists:get_value(username, Opts),
     Password = proplists:get_value(password, Opts),
     case (catch connect(Host, Port, ?CONN_TIMEOUT, ?keepalive, Username, Password)) of
-	{ok, Pid} ->
-	    {ok, Pid};
+	{ok, Pid, Head} ->
+	    {ok, Pid, Head};
 	{error, Error} ->
 	    {stop, Error};
     {'EXIT', Reason} ->
