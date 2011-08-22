@@ -48,7 +48,7 @@ get_data(Pid, Cmd, Head, Acc) ->
             Data1 =  string:join(Data, ?splite),
             get_data(Pid, " ", Head, [Data1|Acc]);
         {ok, Data, PromptType, Rest} ->
-            ?INFO("Return: ~p, PromptType : ~p, ~n, Rest :~p", [Data, PromptType, Rest]),
+            ?INFO("get end data: ~p, PromptType : ~p, ~n, Rest :~p", [Data, PromptType, Rest]),
             Data1 =  string:join(Data, ?splite),
             AllData = string:join(lists:reverse([Data1|Acc]), ?splite),
             {ok, AllData};

@@ -40,7 +40,7 @@ get_data(Pid, Cmd, Head, Acc, LastLine) ->
             Data1 =  string:join(Data, ?splite),
             get_data(Pid, " ", Head, [Data1|Acc], Lastline1);
         {ok, Data, PromptType, Rest} ->
-            ?INFO("Return: ~p, PromptType : ~p, ~n, Rest :~p", [Data, PromptType, Rest]),
+            ?INFO("get end data: ~p, PromptType : ~p, ~n, Rest :~p", [Data, PromptType, Rest]),
             Data1 =  string:join(Data, ?splite),
             Lastline1 = string:strip(lists:last(Data)),
             case  Lastline1 of
