@@ -205,6 +205,8 @@ split_lines([$\r|Rest],Line,Lines) ->
 %add hejin 2011-5-20 写文件，操作符无意义
 split_lines([$\b|Rest],Line,Lines) ->
     split_lines(Rest,Line,Lines);
+split_lines([$\e|Rest],Line,Lines) ->
+    split_lines(Rest,Line,Lines);
 split_lines([0|Rest],Line,Lines) ->
     split_lines(Rest,Line,Lines);
 split_lines([Char|Rest],Line,Lines) ->

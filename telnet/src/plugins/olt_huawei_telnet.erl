@@ -3,6 +3,7 @@
 -author("hejin 2011-8-17").
 
 -export([start/1,
+        send_data/2,
         get_data/2, get_data/3,
         close/2
         ]).
@@ -25,6 +26,9 @@
 
 start(Opts) ->
     init(Opts).
+
+send_data(Pid, Data) ->
+    telnet_client:send_data(Pid, Data).
 
 %flow
 get_data(Pid, Head) ->
@@ -62,7 +66,7 @@ get_data(Pid, Cmd, Head, Acc) ->
 close(Pid, Head) ->
     ?INFO("close telnet....~p",[Head]),
     get_data(Pid, "quit", Head),
-    get_data(Pid, "y", Head),
+    send_data(Pid, "y"),
     telnet_client:close(Pid).
 
 init(Opts) ->

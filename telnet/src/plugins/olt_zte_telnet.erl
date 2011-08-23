@@ -3,6 +3,7 @@
 -author("hejin-2011-5-16").
 
 -export([start/1,
+        send_data/2,
         get_data/2, get_data/3,
         close/2
         ]).
@@ -24,6 +25,9 @@
 
 start(Opts) ->
     init(Opts).
+
+send_data(Pid, Data) ->
+    telnet_client:send_data(Pid, Data).
 
 get_data(Pid, Head) ->
     get_data(Pid, "show running-config", Head).
@@ -59,8 +63,8 @@ get_data(Pid, Cmd, Head, Acc, LastLine) ->
             {ok, AllData}
     end.
 
-close(Pid, Head) ->
-    get_data(Pid, "quit", Head),
+close(Pid, _Head) ->
+    send_data(Pid, "quit"),
     telnet_client:close(Pid).
 
 init(Opts) ->
