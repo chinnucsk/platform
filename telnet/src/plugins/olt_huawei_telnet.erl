@@ -17,8 +17,9 @@
 -define(password, "User password:").
 -define(termchar, "#$|>$").
 -define(comfirm, "section<K>\\|").
--define(page, "-- More ").
--define(prx, ?username ++ "|" ++ ?password ++ "|" ++ ?comfirm ++ "|" ++ ?page).
+-define(page, "---- More.* ----").
+-define(logout, "Are you sure to log out").
+-define(prx, ?username ++ "|" ++ ?password ++ "|" ++ ?comfirm ++ "|" ++ ?page ++ "|" ++ ?logout).
 
 -define(keepalive, true).
 
@@ -46,14 +47,17 @@ get_data(Pid, Cmd, Head) ->
 get_data(Pid, Cmd, Head, Acc) ->
     NewPrx = ?prx ++ "|" ++ Head ++ "#",
     case telnet_gen_conn:teln_cmd(Pid, Cmd, NewPrx, ?CMD_TIMEOUT) of
-        {ok, Data, ?page, Rest} ->
-            Lastline1 = string:strip(lists:last(Data)),
-            ?INFO("more: ~p, lastline: ~p, ~n, Rest : ~p", [Data, Lastline1, Rest]),
-            Data1 =  string:join(Data, ?splite),
-            get_data(Pid, " ", Head, [Data1|Acc]);
-        {ok, Data, PromptType, Rest} ->
+        {ok, [Firstline|Data], "---- More" ++ _ , Rest} ->
+            ?INFO("more: ~p, First: ~p, ~n, Rest : ~p", [Data, Firstline, Rest]),
+            Firstline2 = check_line(Firstline),
+            Data1 =  string:join([check_line(Firstline2)|Data], ?splite),
+            Data2 = Data1 ++ check_line(Rest),
+            ?INFO("check_line: ~p, chec_rest : ~p", [Data, check_line(Rest)]),
+            get_data(Pid, " ", Head, [Data2|Acc]);
+        {ok, [Firstline|Data], PromptType, Rest} ->
             ?INFO("get end data: ~p, PromptType : ~p, ~n, Rest :~p", [Data, PromptType, Rest]),
-            Data1 =  string:join(Data, ?splite),
+            Firstline2 = check_line(Firstline),
+            Data1 =  string:join([check_line(Firstline2)|Data], ?splite),
             AllData = string:join(lists:reverse([Data1|Acc]), ?splite),
             {ok, AllData};
         Error ->
@@ -62,6 +66,23 @@ get_data(Pid, Cmd, Head, Acc) ->
             AllData = string:join(lists:reverse([Data1|Acc]), ?splite),
             {ok, AllData}
     end.
+
+check_line(String) ->
+    check_line(String,[]).
+check_line([$\r|Rest],Line) ->
+    check_line(Rest,Line);
+check_line("---- More ( Press 'Q' to break ) ----" ++ Data, Line) ->
+    check_line(Data, Line);
+check_line([$\e] ++"[37D                                     "++ [$\e] ++ "[37D" ++ [$\e] ++ "[1A" ++ Data, Line) ->
+    check_line(Data, Line);
+check_line([$\e] ++"[37D" ++ [$\e] ++ "[1A" ++ Data, Line) ->
+    check_line(Data, Line);
+check_line([$\e] ++"[37D" ++ Data, Line) ->
+    check_line(Data, Line);
+check_line([Char|Rest],Line) ->
+    check_line(Rest,[Char|Line]);
+check_line([],Line) ->
+    lists:reverse(Line).
 
 close(Pid, Head) ->
     ?INFO("close telnet....~p",[Head]),
@@ -120,7 +141,7 @@ connect(Ip,Port,Timeout,KeepAlive,Username,Password) ->
                                     {error,Error}
                             end;
                         {ok,[{prompt,_OtherPrompt1},{prompt,_OtherPrompt2}],_} ->
-                            {ok,Pid, "$"};
+                            {ok,Pid, "."};
                         Error ->
                             ?WARNING("Did not get expected prompt\n~p\n",[Error]),
                             {error,Error}

@@ -33,35 +33,41 @@ get_data(Pid, Head) ->
     get_data(Pid, "show running-config", Head).
 
 get_data(Pid, Cmd, Head) ->
-    get_data(Pid, Cmd, Head, [], []).
+    get_data(Pid, Cmd, Head, []).
 
-get_data(Pid, Cmd, Head, Acc, LastLine) ->
+get_data(Pid, Cmd, Head, Acc) ->
     NewPrx = ?prx ++ "|" ++ Head ++ "#",
     case telnet_gen_conn:teln_cmd(Pid, Cmd, NewPrx, ?CMD_TIMEOUT) of
         {ok, Data, ?page, Rest} ->
             Lastline1 = string:strip(lists:last(Data)),
             ?INFO("more: ~p, lastline: ~p, ~n, Rest : ~p", [Data, Lastline1, Rest]),
             Data1 =  string:join(Data, ?splite),
-            get_data(Pid, " ", Head, [Data1|Acc], Lastline1);
+            Data2 = Data1 ++ check_line(Rest),
+            get_data(Pid, " ", Head, [Data2|Acc]);
         {ok, Data, PromptType, Rest} ->
             ?INFO("get end data: ~p, PromptType : ~p, ~n, Rest :~p", [Data, PromptType, Rest]),
             Data1 =  string:join(Data, ?splite),
-            Lastline1 = string:strip(lists:last(Data)),
-            case  Lastline1 of
-                LastLine ->
-                    ?INFO("get end Lastline  ~p, ~n, acc :~p", [Lastline1, Acc]),
-                    AllData = string:join(lists:reverse([Data1|Acc]), ?splite),
-                    {ok, AllData};
-                _ ->
-                    Data2 = Data1 ++ PromptType ++ Rest,
-                    get_data(Pid, " ", Head, [Data2|Acc], Lastline1)
-            end;
+            Data2 = Data1 ++ Rest,
+            AllData = string:join(lists:reverse([Data2|Acc]), ?splite),
+            {ok, AllData};
         Error ->
             ?WARNING("Return error: ~p", [Error]),
             Data1 = io_lib:format("telnet send cmd error, cmd: ~p, reason:~p", [Cmd, Error]),
             AllData = string:join(lists:reverse([Data1|Acc]), ?splite),
             {ok, AllData}
     end.
+
+%add hejin 2011-8-23 check rest
+check_line(String) ->
+    check_line(String,[]).
+check_line([$\r|Rest],Line) ->
+    check_line(Rest,Line);
+check_line([$\b|Rest],Line) ->
+    check_line(Rest,Line);
+check_line([Char|Rest],Line) ->
+    check_line(Rest,[Char|Line]);
+check_line([],Line) ->
+    lists:reverse(Line).
 
 close(Pid, _Head) ->
     send_data(Pid, "quit"),
@@ -118,7 +124,7 @@ connect(Ip,Port,Timeout,KeepAlive,Username,Password) ->
                                     {error,Error}
                             end;
                         {ok,[{prompt,_OtherPrompt1},{prompt,_OtherPrompt2}],_} ->
-                            {ok,Pid, "$"};
+                            {ok,Pid, "."};
                         Error ->
                             ?WARNING("Did not get expected prompt\n~p\n",[Error]),
                             {error,Error}
