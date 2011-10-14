@@ -266,7 +266,7 @@ do_within_time(Fun,Timeout) ->
             {error,connection_closed}
     after 
         Timeout ->
-            ?INFO("time out ...", []),
+            ?INFO("time out ...~p", [Timeout]),
             exit(TmpPid,kill),
             receive
                 {TmpPid,Result} ->
