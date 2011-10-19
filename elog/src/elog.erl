@@ -2,7 +2,7 @@
 
 -include("elog.hrl").
 
--export([init/2, get/0]).
+-export([init/2, get/0, set/1]).
 
 -define(LOGMODULE, "error_logger").
 
