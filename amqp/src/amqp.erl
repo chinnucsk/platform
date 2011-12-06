@@ -580,8 +580,10 @@ handle_info({#'basic.deliver'{consumer_tag = ConsumerTag,
     routing_key = RoutingKey}, #amqp_msg{props = Properties, payload = Payload} = _Msg}, 
     #state{dict = Dict} = State) ->
     #'P_basic'{content_type = ContentType, correlation_id = CorrelationId, reply_to = ReplyTo} = Properties,
+    ?INFO("get amqp message :~p, ~p, ~p", [ConsumerTag, binary_to_term(Payload), dict:to_list(Dict)]),
     case dict:find({consumer, ConsumerTag}, Dict) of
     {ok, {Consumer, _Ref}} ->
+        ?INFO("get consumer message :~p", [Consumer]),
         Consumer ! {deliver, RoutingKey, [{content_type, ContentType}, 
             {correlation_id, CorrelationId}, {reply_to, ReplyTo}], Payload};
     error -> 

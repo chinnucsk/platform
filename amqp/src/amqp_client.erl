@@ -8,9 +8,9 @@ start(Name, Opts, Succ, Fail) ->
     case amqp:start_link(Name, Opts) of
     {ok, Pid} ->
         Succ(Pid),
+        ?INFO("succ start :~p", [Name]),
         {ok, Pid};
     {error, {already_started, Pid}} ->
-        Succ(Pid),
         {ok, Pid};
     {error, Error} ->
         Fail(Error),

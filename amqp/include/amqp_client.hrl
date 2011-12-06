@@ -22,9 +22,9 @@
 %%
 %%   Contributor(s): Ben Hood <0x6e6562@gmail.com>.
 %%
--include_lib("amqp/include/rabbit.hrl").
+-include_lib("rabbit.hrl").
 
--include_lib("amqp/include/rabbit_framing.hrl").
+-include_lib("rabbit_framing.hrl").
 
 -define(PROTOCOL_HEADER,
         <<"AMQP", 1, 1, ?PROTOCOL_VERSION_MAJOR, ?PROTOCOL_VERSION_MINOR>>).
