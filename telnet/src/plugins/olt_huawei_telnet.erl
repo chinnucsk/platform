@@ -15,7 +15,7 @@
 
 -define(username, "User name:").
 -define(password, "User password:").
--define(termchar, "#$|>$").
+-define(termchar, "#$|>$|---- More.* ----").
 -define(comfirm, "section<K>\\|").
 -define(page, "---- More.* ----").
 -define(logout, "Are you sure to log out").
@@ -40,12 +40,15 @@ get_data(Pid, Head) ->
     ?INFO("get data2 :~p", [Data2]),
     {ok, Data1 ++ Data2}.
 
+get_data(Pid, Cmd, "") ->
+    get_data(Pid, Cmd, ?prx, []);
 get_data(Pid, Cmd, Head) ->
-    get_data(Pid, Cmd, Head, []).
-
-
-get_data(Pid, Cmd, Head, Acc) ->
     NewPrx = ?prx ++ "|" ++ Head ++ "#",
+    get_data(Pid, Cmd, NewPrx, []).
+
+
+get_data(Pid, Cmd, NewPrx, Acc) ->
+    ?INFO("newprx ; ~p", [NewPrx]),
     case telnet_gen_conn:teln_cmd(Pid, Cmd, NewPrx, ?CMD_TIMEOUT) of
         {ok, [Firstline|Data], "---- More" ++ _ , Rest} ->
             ?INFO("more: ~p, First: ~p, ~n, Rest : ~p", [Data, Firstline, Rest]),
@@ -53,7 +56,7 @@ get_data(Pid, Cmd, Head, Acc) ->
             Data1 =  string:join([check_line(Firstline2)|Data], ?splite),
             Data2 = Data1 ++ check_line(Rest),
             ?INFO("check_line: ~p, chec_rest : ~p", [Data, check_line(Rest)]),
-            get_data(Pid, " ", Head, [Data2|Acc]);
+            get_data(Pid, " ", NewPrx, [Data2|Acc]);
         {ok, [Firstline|Data], PromptType, Rest} ->
             ?INFO("get end data: ~p, PromptType : ~p, ~n, Rest :~p", [Data, PromptType, Rest]),
             Firstline2 = check_line(Firstline),
@@ -92,6 +95,7 @@ close(Pid, Head) ->
 
 init(Opts) ->
     io:format("starting telnet conn ...~p",[Opts]),
+    process_flag(trap_exit, true),
     Host = proplists:get_value(host, Opts, "localhost"),
     Port = proplists:get_value(port, Opts, 23),
     Username = proplists:get_value(username, Opts),
@@ -119,16 +123,21 @@ connect(Ip,Port,Timeout,KeepAlive,Username,Password) ->
                                     ok = telnet_client:send_data(Pid,Password),
 %                                   Stars = lists:duplicate(length(Password),$*),
                                     ?INFO("Password: ~s",[Password]),
-%                                   ok = telnet_client:send_data(Pid,""),
+                                   ok = telnet_client:send_data(Pid,""),
                                     case telnet:silent_teln_expect(Pid,[],prompt,
                                                                    ?termchar,[]) of
                                         {ok,{prompt,Prompt},Rest}  ->
                                             ?INFO("get login over.....propmpt:~p,~p", [Prompt, Rest]),
                                             case telnet_gen_conn:teln_cmd(Pid, "", ?termchar, ?CMD_TIMEOUT) of
+                                                {ok, _Data, "---- More" ++ _ , Rest} ->
+                                                    ?INFO("get more :~p",[Rest]),
+                                                    ok = telnet_client:send_data(Pid," "),
+                                                    {ok, Pid, ""};
                                                 {ok, Data, PromptType, Rest} ->
                                                     ?INFO("get head data .....propmpt:~p,~p", [Data, PromptType]),
                                                     {ok, Pid, string:join(lists:reverse(Data), "")};
                                                 Error ->
+                                                    ?ERROR("error after login :~p", [Error]),
                                                     {error,Error}
                                             end;
                                         Error ->
