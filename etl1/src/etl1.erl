@@ -102,13 +102,7 @@ do_init(Tl1Options) ->
     process_flag(trap_exit, true),
     ets:new(tl1_request_table, [set, named_table, protected, {keypos, #request.id}]),
     Pids = connect_tl1(Tl1Options),
-    Pids2 = case mysql:select(tl1_ems_info) of
-        {ok, Tl1Ems} ->
-            connect_tl1(Tl1Ems);
-        _ ->
-            []
-        end,
-    {ok, lists:flatten(Pids ++ Pids2)}.
+    {ok, lists:flatten(Pids)}.
 
 connect_tl1(Tl1Infos) ->
     lists:map(fun(Tl1) ->
