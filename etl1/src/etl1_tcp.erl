@@ -19,7 +19,7 @@
 
 -define(TIMEOUT, 8000).
 
--record(state, {host, port, username, password, socket, conn_state}).
+-record(state, {host, port, username, password, socket, conn_state, rest = <<>>, data = []}).
 
 -include("tl1.hrl").
 
@@ -133,10 +133,20 @@ handle_cast(Msg, State) ->
 %%          {noreply, State, Timeout} |
 %%          {stop, Reason, State}            (terminate/2 is called)
 %%--------------------------------------------------------------------
-handle_info({tcp, Sock, Bytes}, #state{socket = Sock} = State) ->
+handle_info({tcp, Sock, Bytes}, #state{socket = Sock, rest = Rest, data = Data} = State) ->
     ?INFO("received tcp ~p ", [Bytes]),
-    handle_recv_msg(Bytes, State),
-    {noreply, State};
+    {NewData, NewRest} = case binary:last(Bytes) of
+        $; ->
+            handle_recv_msg(list_to_binary([Rest, Bytes]), State),
+            {[], <<>>};
+        $> ->
+            NowData = handle_recv_wait(list_to_binary([Rest, Bytes]), State),
+            ?INFO("get now data :~p",[NowData]),
+            {NowData, <<>>};
+        _ ->
+            {Data, list_to_binary([Rest, Bytes])}
+       end,
+    {noreply, State#state{rest = NewRest, data = NewData}};
 
 handle_info({tcp_closed, Socket}, #state{socket = Socket, host = Host, port = Port} = State) ->
     ?ERROR("tcp close: ~p,~p,~p", [Host, Port, Socket]),
@@ -222,11 +232,24 @@ send_failed(Pct, ERROR) ->
     etc1 ! {tl1_error, Pct, ERROR}.
 
 %% receive
+handle_recv_wait(Bytes, _State) ->
+    case (catch etl1_mpd:process_msg(Bytes)) of
+	{ok, Pct} when is_record(Pct, pct) ->
+        case Pct#pct.data of
+            {ok, Data} ->
+                Data;
+            {error, _Reason} ->
+                []
+        end ;
+	Error ->
+	    ?ERROR("processing of received message failed: ~n ~p", [Error]),
+	    []
+    end.
+
 handle_recv_msg(Bytes, _State) when is_binary(Bytes) and (size(Bytes) == 0) ->
     ?WARNING("snmp error: ~p", [empty_message]),
     ok;
-
-handle_recv_msg(Bytes, _State) ->
+handle_recv_msg(Bytes, #state{data = Data}) ->
     case (catch etl1_mpd:process_msg(Bytes)) of
 	%% BMK BMK BMK
 	%% Do we really need message size here??
@@ -238,7 +261,14 @@ handle_recv_msg(Bytes, _State) ->
 %	{ok, _Vsn, #pdu{type = 'acknowledgment'} = Pdu, _MS, _ACM} ->
 
 	{ok, Pct} when is_record(Pct, pct) ->
-        etl1 ! {tl1_tcp, Pct};
+        NewData = case Pct#pct.data of
+            {ok, Data2} ->
+                {ok, Data ++ Data2};
+            {error, _Reason} ->
+                {error, _Reason}
+        end,
+        ?INFO("send tl1 data :~p", [NewData]),
+        etl1 ! {tl1_tcp, Pct#pct{data = NewData}};
     
 	Error ->
 	    ?ERROR("processing of received message failed: ~n ~p", [Error]),

@@ -36,17 +36,19 @@ process_msg(MsgData) ->
     ?INFO("get respond splite :~p", [Lines]),
     _Header = lists:nth(1, Lines),
     RespondId = lists:nth(2, Lines),
-    RespondBlock = lists:nthtail(2, Lines), 
-    Terminator = lists:last(Lines),
     {ReqId, CompletionCode} = get_response_id(RespondId),
-    RespondData = case get_response(CompletionCode, RespondBlock) of
-        {error, Reason} ->
-            {error, Reason};
+    RespondBlock = lists:nthtail(2, Lines),
+    {{En, Endesc}, Rest} = get_response_status(RespondBlock),
+    ?INFO("get en endesc :~p data:~p",[{En,Endesc}, Rest]),
+    RespondData = case get_response(CompletionCode, Rest) of
+        no_data ->
+            {ok, [{en, En}, {endesc, Endesc}]};
         {data, #tl1_response{fields = Fileds, records = Records}} ->
             {ok, to_tuple_records(Fileds, Records)};
-        {no_data,  #tl1_response{en = En, endesc=Endesc}} ->
-            {ok, [{en, En}, {endesc, Endesc}]}
+        {error, Reason} ->
+            {error, Reason}
      end,
+    Terminator = lists:last(Lines),
     ?INFO("req_id: ~p,comp_code: ~p, terminator: ~p, data:~p",[ReqId, CompletionCode, Terminator, RespondData]),
     Pct = #pct{type = 'output',
                request_id = ReqId,
@@ -61,42 +63,50 @@ get_response_id(RespondId) ->
     CompletionCode = lists:last(Data),
     {to_integer(ReqId), CompletionCode}.
 
+get_response_status([Status|Data]) ->
+    ?INFO("get status :~p", [Status]),
+    {En, Rest} = get_status("EN=", Status),
+    ?INFO("get en :~p, ~p", [En, Rest]),
+    case En of
+        false ->
+            {{false, false}, [Status|Data]};
+        _ ->
+            {Endesc, Rest1} = get_status("ENDESC=", Rest),
+            ?INFO("get endesc :~p, ~p", [En, Rest1]),
+            {{En, Endesc}, Data}
+     end.       
+
 %DELAY, DENY, PRTL, RTRV
 get_response("COMPLD", Data)->
     %\r\n\r\n -> error =[]
      get_response_data(Data);
+get_response("PRTL", Data)->
+     get_response_data(Data);
 get_response(_CompCode, Data)->
      {error, string:join(Data, ",")}.
 
-get_response_data([Status, ";"]) ->
-    ?INFO("get status :~p", [Status]),
-    {En, Rest} = get_status("EN=", Status),
-    ?INFO("get en :~p, ~p", [En, Rest]),
-    {Endesc, Rest1} = get_status("ENDESC=", Rest),
-    ?INFO("get endesc :~p, ~p", [En, Rest1]),
-    {no_data, #tl1_response{en = En, endesc=Endesc}};
+
 get_response_data(Block) ->
     ?INFO("get Block:~p", [Block]),
     {TotalPackageNo, Block0} = get_response_data("total_blocks=", Block),
     {CurrPackageNo, Block1} = get_response_data("block_number=", Block0),
     {PackageRecordsNo, Block2} = get_response_data("block_records=", Block1),
-    {Title, Block3} = get_response_data("list of", Block2),
+    {Title, Block3} = get_response_data("list of|List of", Block2),
     {_SpliteLine, Block4} = get_response_data("---", Block3),
     ?INFO("get response:~p", [{TotalPackageNo, CurrPackageNo, PackageRecordsNo, Title}]),
     case get_response_data(fields, Block4) of
 			{fields, []} ->
-                {no_data, #tl1_response{en="no",endesc = "nodata"}};
+                no_data;
 			{Fields, Block5} ->
 			    {ok, Rows} =  get_rows(Block5),
 				{data, #tl1_response{endesc= "COMPLD", fields = Fields, records = Rows}}
 		    end.
 
 
-
 get_status(Name, String) ->
     case string:str(String, Name) of
         0 ->
-            {"", ""};
+            {false, ""};
         N ->
             Rest = string:substr(String, N + length(Name)),
             ?INFO("rest :~p", [Rest]),
@@ -133,8 +143,13 @@ get_response_data(fields, [Line|Response]) ->
      Fields = string:tokens(Line, "\t"),
     {Fields, Response};
 get_response_data(Name, [Line|Response]) ->
-    Value = string:strip(Line) -- Name,
-    {Value, Response}.
+    case re:run(Line, Name) of
+        nomatch ->
+            get_response_data(Name, Response);
+        {match, _N} ->
+            Value = string:strip(Line) -- Name,
+            {Value, Response}
+        end.
 
 
 to_tuple_records(_Fields, []) ->
