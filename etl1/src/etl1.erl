@@ -6,6 +6,7 @@
 
 %% Network Interface callback functions
 -export([start_link/1,
+        set_tl1/1,
         input/2, input/3,
         input_group/2, input_group/3
      ]).
@@ -36,6 +37,9 @@ start_link(Tl1Options) ->
     ?INFO("start etl1....~p",[Tl1Options]),
 	gen_server:start_link({local, ?MODULE},?MODULE, [Tl1Options], []).
 
+set_tl1(Tl1Info) ->
+    ?INFO("set tl1 info....~p",[Tl1Info]),
+    gen_server:call(?MODULE, {set_tl1, Tl1Info}, ?CALL_TIMEOUT).
 
 %%Cmd = LST-ONUSTATE::OLTID=${oltid},PORTID=${portid}:CTAG::;
 input(Type, Cmd) ->
@@ -62,7 +66,7 @@ input(Type, Cmd, Timeout) when is_tuple(Type)->
             {error, Error}
 	end;
 input(Type, Cmd, Timeout) ->
-    input({Type, "null"}, Cmd, Timeout).
+    input({Type, ""}, Cmd, Timeout).
 
 input_group(Type, Cmd) ->
     input_group(Type, Cmd, ?REQ_TIMEOUT).
@@ -102,22 +106,25 @@ do_init(Tl1Options) ->
     process_flag(trap_exit, true),
     ets:new(tl1_request_table, [set, named_table, protected, {keypos, #request.id}]),
     Pids = connect_tl1(Tl1Options),
-    {ok, lists:flatten(Pids)}.
+    {ok, Pids}.
 
 connect_tl1(Tl1Infos) ->
-    lists:map(fun(Tl1) ->
-        Type = proplists:get_value(manu, Tl1),
-        City = proplists:get_value(city, Tl1, <<"null">>),
-        Name = list_to_atom(lists:concat(["etl1_tcp_", to_list(Type), "_", binary_to_list(City)])),
-        case etl1_tcp:start_link(Name, Tl1) of
-            {ok, Pid} ->
-                {{to_list(Type), to_list(City)}, Pid};
-            {error, Error} ->
-                ?ERROR("get tcp error: ~p, ~p", [Error, Tl1]),
-                []
-         end
-    end, Tl1Infos).
+    Pids = lists:map(fun(Tl1Info) ->
+        do_connect(Tl1Info)
+    end, Tl1Infos),
+    lists:flatten(Pids).
 
+do_connect(Tl1Info) ->
+    Type = proplists:get_value(manu, Tl1Info),
+    CityId = proplists:get_value(cityid, Tl1Info, <<"">>),
+    Name = list_to_atom(lists:concat(["etl1_tcp_", to_list(Type), "_", binary_to_list(CityId)])),
+    case etl1_tcp:start_link(Name, Tl1Info) of
+        {ok, Pid} ->
+            {{to_list(Type), to_list(CityId)}, Pid};
+        {error, Error} ->
+            ?ERROR("get tcp error: ~p, ~p", [Error, Tl1Info]),
+            []
+     end.
 
 %%--------------------------------------------------------------------
 %% Func: handle_call/3
@@ -128,6 +135,11 @@ connect_tl1(Tl1Infos) ->
 %%          {stop, Reason, Reply, State}   | (terminate/2 is called)
 %%          {stop, Reason, State}            (terminate/2 is called)
 %%--------------------------------------------------------------------
+handle_call({set_tl1, Tl1Info}, _From, #state{tl1_tcp = Pids} = State) ->
+    NewPid = do_connect(Tl1Info),
+    NewState = State#state{tl1_tcp = [NewPid|Pids]},
+    {reply, ok, NewState};
+
 handle_call({sync_input, Send, Type, Cmd, Timeout}, From, #state{tl1_tcp = Pids} = State) ->
     ?INFO("handle_call,Pid:~p,from:~p, Cmd,~p", [{Send, node(Send)}, From, Cmd]),
     case get_tl1_tcp(Type, Pids) of
