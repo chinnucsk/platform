@@ -7,6 +7,7 @@
 %% Network Interface callback functions
 -export([start_link/1,
         set_tl1/1,
+        get_tl1/0,
         input/2, input/3,
         input_group/2, input_group/3
      ]).
@@ -36,6 +37,10 @@
 start_link(Tl1Options) ->
     ?INFO("start etl1....~p",[Tl1Options]),
 	gen_server:start_link({local, ?MODULE},?MODULE, [Tl1Options], []).
+
+get_tl1() ->
+    gen_server:call(?MODULE, get_tl1, ?CALL_TIMEOUT).
+
 
 set_tl1(Tl1Info) ->
     ?INFO("set tl1 info....~p",[Tl1Info]),
@@ -160,6 +165,9 @@ handle_call({sync_input, Send, Type, Cmd, Timeout}, From, #state{tl1_tcp = Pids}
             ?ERROR("tl1 connect too much,type:~p, state:~p",[Type,State]),
             {reply, {many_type, Type}, State}
      end;
+
+handle_call(get_tl1, _From, State) ->
+    {reply, {ok, State}, State};
 
 handle_call(Req, _From, State) ->
     ?WARNING("unexpect request: ~p", [Req]),
