@@ -19,10 +19,11 @@
         set_severity/1,
         get_severity/0,
 		crit/4,
-        error/4, 
+        error/4,
         warn/4,
         info/4,
 		debug/4,
+		syslog/5,
         stop/0]).
 
 -export([init/1,
