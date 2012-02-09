@@ -142,7 +142,11 @@ do_connect(Tl1Info) ->
 %%          {stop, Reason, State}            (terminate/2 is called)
 %%--------------------------------------------------------------------
 handle_call(get_tl1, _From, #state{tl1_tcp = Pids} = State) ->
-    {reply, {ok, State}, State};
+    Result = lists:map(fun(Pid) ->
+        {ok, TcpState} = etl1_tcp:get_tcp(Pid),
+        TcpState
+    end, Pids),
+    {reply, {ok, Result}, State};
 
 handle_call({set_tl1, Tl1Info}, _From, #state{tl1_tcp = Pids} = State) ->
     NewPid = do_connect(Tl1Info),
