@@ -6,7 +6,7 @@
 
 %% Network Interface callback functions
 -export([start_link/2, 
-        get_tcp/1,
+        get_status/1,
         send_tcp/2]).
 
 %% gen_server callbacks
@@ -36,8 +36,8 @@ start_link(Name, NetIfOpts) ->
     ?INFO("start etl1_tcp....~p,~p",[Name, NetIfOpts]),
 	gen_server:start_link({local, Name},?MODULE, [NetIfOpts], []).
 
-get_tcp(Pid) ->
-    gen_server:call(Pid, get_tcp).
+get_status(Pid) ->
+    gen_server:call(Pid, get_status).
 
 send_tcp(Pid, Ptc)  ->
     gen_server:cast(Pid, Ptc).
@@ -106,7 +106,7 @@ login(Socket, Username, Password) ->
 %%          {stop, Reason, Reply, State}   | (terminate/2 is called)
 %%          {stop, Reason, State}            (terminate/2 is called)
 %%--------------------------------------------------------------------
-handle_call(get_tcp, _From, State) ->
+handle_call(get_status, _From, State) ->
     {reply, {ok, State}, State};
 
 handle_call(stop, _From, State) ->

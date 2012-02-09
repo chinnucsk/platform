@@ -143,7 +143,7 @@ do_connect(Tl1Info) ->
 %%--------------------------------------------------------------------
 handle_call(get_tl1, _From, #state{tl1_tcp = Pids} = State) ->
     Result = lists:map(fun(Pid) ->
-        {ok, TcpState} = etl1_tcp:get_tcp(Pid),
+        {ok, TcpState} = etl1_tcp:get_status(Pid),
         TcpState
     end, Pids),
     {reply, {ok, Result}, State};
