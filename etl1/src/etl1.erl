@@ -1,6 +1,6 @@
 -module(etl1).
 
--author("hejin-03-28").
+-author("hejin-2011-03-28").
 
 -behaviour(gen_server).
 
@@ -141,6 +141,9 @@ do_connect(Tl1Info) ->
 %%          {stop, Reason, Reply, State}   | (terminate/2 is called)
 %%          {stop, Reason, State}            (terminate/2 is called)
 %%--------------------------------------------------------------------
+handle_call(get_tl1, _From, #state{tl1_tcp = Pids} = State) ->
+    {reply, {ok, State}, State};
+
 handle_call({set_tl1, Tl1Info}, _From, #state{tl1_tcp = Pids} = State) ->
     NewPid = do_connect(Tl1Info),
     NewState = State#state{tl1_tcp = [NewPid|Pids]},
@@ -165,9 +168,6 @@ handle_call({sync_input, Send, Type, Cmd, Timeout}, From, #state{tl1_tcp = Pids}
             ?ERROR("tl1 connect too much,type:~p, state:~p",[Type,State]),
             {reply, {many_type, Type}, State}
      end;
-
-handle_call(get_tl1, _From, State) ->
-    {reply, {ok, State}, State};
 
 handle_call(Req, _From, State) ->
     ?WARNING("unexpect request: ~p", [Req]),

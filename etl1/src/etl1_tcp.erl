@@ -1,6 +1,6 @@
 -module(etl1_tcp).
 
--author("hejin-03-24").
+-author("hejin-2011-03-24").
 
 -behaviour(gen_server).
 
@@ -15,9 +15,9 @@
 -define(USERNAME, "root").
 -define(PASSWORD, "public").
 
--define(TCP_OPTIONS, [binary, {packet, 0}, {active, true}, {reuseaddr, true}, {send_timeout, 3000}]).
+-define(TCP_OPTIONS, [binary, {packet, 0}, {active, true}, {reuseaddr, true}, {send_timeout, 6000}]).
 
--define(TIMEOUT, 8000).
+-define(TIMEOUT, 12000).
 
 -record(state, {host, port, username, password, socket, conn_state, rest = <<>>, data = []}).
 
