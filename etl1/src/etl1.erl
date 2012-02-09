@@ -115,9 +115,10 @@ connect_tl1(Tl1Infos) ->
     lists:flatten(Pids).
 
 do_connect(Tl1Info) ->
+    ?INFO("get tl1 info:~p", [Tl1Info]),
     Type = proplists:get_value(manu, Tl1Info),
     CityId = proplists:get_value(cityid, Tl1Info, <<"">>),
-    Name = list_to_atom(lists:concat(["etl1_tcp_", to_list(Type), "_", binary_to_list(CityId)])),
+    Name = list_to_atom(lists:concat(["etl1_tcp_", to_list(Type), "_", to_list(CityId)])),
     case etl1_tcp:start_link(Name, Tl1Info) of
         {ok, Pid} ->
             {{to_list(Type), to_list(CityId)}, Pid};
