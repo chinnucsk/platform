@@ -73,7 +73,7 @@ get_table(Addr, Columns, AgentData, Timeout)
 
 get_table(Addr, Port, Columns, AgentData, TIMEOUT) ->
 	[{_, Col1Oid} | _] = Columns,
-	case get_table(Addr, Port, Col1Oid, Columns, AgentData, TIMEOUT, []) of
+	case get_table(Addr, Port, formatoid(Col1Oid), Columns, AgentData, TIMEOUT, []) of
 	{ok, Rows} ->
 		{ok, lists:reverse(Rows)};
 	{error, Error} ->
@@ -147,7 +147,7 @@ split_vars(Vars) ->
 	split_vars(Vars, [], []).
 
 split_vars([{Name, Oid}|T], Names, Oids) ->
-	split_vars(T, [Name|Names], [Oid|Oids]);
+	split_vars(T, [Name|Names], [formatoid(Oid)|Oids]);
 split_vars([], Names, Oids) ->
 	{lists:reverse(Names), lists:reverse(Oids)}.
 
@@ -155,7 +155,7 @@ split_var_vals(VarList) ->
     split_var_vals(VarList, [], []).
 
 split_var_vals([{Name, Oid, Type, Val}|T], Names, VarsAndVals) ->
-    split_var_vals(T, [Name|Names], [{Oid, Type, Val}|VarsAndVals]);
+    split_var_vals(T, [Name|Names], [{formatoid(Oid), Type, Val}|VarsAndVals]);
 split_var_vals([], Names, VarsAndVals) ->
     {lists:reverse(Names), lists:reverse(VarsAndVals)}.
 	
@@ -187,3 +187,12 @@ start_with_oid(Oid1, Oid2) ->
 		false
 	end.
 
+formatoid(Oid) ->
+    %bug oid 有 46 就出问题了
+    DotIdx = string:chr(Oid, $.),
+    if
+    (DotIdx > 0) and (DotIdx < 6) ->
+        [list_to_integer(O) || O <- string:tokens(Oid, ".")];
+    true ->
+        Oid
+    end.
