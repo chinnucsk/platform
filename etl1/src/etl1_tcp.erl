@@ -1,11 +1,13 @@
 -module(etl1_tcp).
 
--author("hejin-03-24").
+-author("hejin-2011-03-24").
 
 -behaviour(gen_server).
 
 %% Network Interface callback functions
--export([start_link/2, send_tcp/2]).
+-export([start_link/2, 
+        get_status/1,
+        send_tcp/2]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, code_change/3, terminate/2]).
@@ -15,9 +17,9 @@
 -define(USERNAME, "root").
 -define(PASSWORD, "public").
 
--define(TCP_OPTIONS, [binary, {packet, 0}, {active, true}, {reuseaddr, true}, {send_timeout, 3000}]).
+-define(TCP_OPTIONS, [binary, {packet, 0}, {active, true}, {reuseaddr, true}, {send_timeout, 6000}]).
 
--define(TIMEOUT, 8000).
+-define(TIMEOUT, 12000).
 
 -record(state, {host, port, username, password, socket, conn_state, rest = <<>>, data = []}).
 
@@ -33,6 +35,9 @@
 start_link(Name, NetIfOpts) ->
     ?INFO("start etl1_tcp....~p,~p",[Name, NetIfOpts]),
 	gen_server:start_link({local, Name},?MODULE, [NetIfOpts], []).
+
+get_status(Pid) ->
+    gen_server:call(Pid, get_status).
 
 send_tcp(Pid, Ptc)  ->
     gen_server:cast(Pid, Ptc).
@@ -101,6 +106,9 @@ login(Socket, Username, Password) ->
 %%          {stop, Reason, Reply, State}   | (terminate/2 is called)
 %%          {stop, Reason, State}            (terminate/2 is called)
 %%--------------------------------------------------------------------
+handle_call(get_status, _From, State) ->
+    {reply, {ok, State}, State};
+
 handle_call(stop, _From, State) ->
     ?INFO("received stop request", []),
     {stop, normal, State};

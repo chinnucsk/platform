@@ -1,12 +1,13 @@
 -module(etl1).
 
--author("hejin-03-28").
+-author("hejin-2011-03-28").
 
 -behaviour(gen_server).
 
 %% Network Interface callback functions
 -export([start_link/1,
         set_tl1/1,
+        get_tl1/0,
         input/2, input/3,
         input_group/2, input_group/3
      ]).
@@ -36,6 +37,10 @@
 start_link(Tl1Options) ->
     ?INFO("start etl1....~p",[Tl1Options]),
 	gen_server:start_link({local, ?MODULE},?MODULE, [Tl1Options], []).
+
+get_tl1() ->
+    gen_server:call(?MODULE, get_tl1, ?CALL_TIMEOUT).
+
 
 set_tl1(Tl1Info) ->
     ?INFO("set tl1 info....~p",[Tl1Info]),
@@ -136,6 +141,13 @@ do_connect(Tl1Info) ->
 %%          {stop, Reason, Reply, State}   | (terminate/2 is called)
 %%          {stop, Reason, State}            (terminate/2 is called)
 %%--------------------------------------------------------------------
+handle_call(get_tl1, _From, #state{tl1_tcp = Pids} = State) ->
+    Result = lists:map(fun(Pid) ->
+        {ok, TcpState} = etl1_tcp:get_status(Pid),
+        TcpState
+    end, Pids),
+    {reply, {ok, Result}, State};
+
 handle_call({set_tl1, Tl1Info}, _From, #state{tl1_tcp = Pids} = State) ->
     NewPid = do_connect(Tl1Info),
     NewState = State#state{tl1_tcp = [NewPid|Pids]},
