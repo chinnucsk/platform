@@ -98,7 +98,7 @@ delete(Tab0, Where0) when is_tuple(Where0) ->
 	sql_query(list_to_binary(Query)).
 
 sql_query(Query) ->
-	case mysql_to_odbc(mysql_conn:sql_query(to_binary(Query))) of
+	case catch mysql_to_odbc(mysql_conn:sql_query(to_binary(Query))) of
     {selected, NewFields, Records} -> 
         {ok, to_tuple_records(NewFields, Records)};
     {error, Reason} -> 
