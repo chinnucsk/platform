@@ -26,4 +26,4 @@ init(Opts) ->
         Id = "mysql_conn_" ++ integer_to_list(I),
         {Id, {mysql_conn, start_link, [Opts]}, permanent, 10, worker, [mysql_conn]}
     end || I <- lists:seq(1, PoolSize)], 
-    {ok, {{one_for_one, 10, 1000}, Clients}}.
+    {ok, {{one_for_one, 10, 100}, Clients}}.
