@@ -25,7 +25,7 @@
 
 -define(CALL_TIMEOUT, 30000).
 
--import(extbif, [to_list/1, to_binary/1]).
+-import(extbif, [to_list/1, to_binary/1, to_integer/1]).
 
 -record(request,  {id, type, data, ref, from}).
 
@@ -142,7 +142,7 @@ do_connect(Tl1Info) ->
 %%          {stop, Reason, State}            (terminate/2 is called)
 %%--------------------------------------------------------------------
 handle_call(get_tl1, _From, #state{tl1_tcp = Pids} = State) ->
-    Result = lists:map(fun(Pid) ->
+    Result = lists:map(fun({_Type, Pid}) ->
         {ok, TcpState} = etl1_tcp:get_status(Pid),
         TcpState
     end, Pids),
@@ -166,7 +166,7 @@ handle_call({sync_input, Send, Type, Cmd, Timeout}, From, #state{tl1_tcp = Pids}
                     {reply, Error, State}
             end;
         [] ->
-            ?ERROR("error:disconn,type:~p, state:~p",[Type,State]),
+            ?ERROR("error:type:~p, state:~p",[Type,State]),
             {reply, {no_type, Type}, State};
         _ ->
             ?ERROR("tl1 connect too much,type:~p, state:~p",[Type,State]),
@@ -279,7 +279,7 @@ handle_tl1_error(#pct{request_id = ReqId} = _Pct, Reason) ->
 %% receive
 handle_recv_tcp(#pct{type = 'output', request_id = ReqId, complete_code = CompCode, data = Data} = _Pct,  _State) ->
     ?INFO("recv tcp reqid:~p, code:~p, data:~p",[ReqId, CompCode, Data]),
-    case ets:lookup(tl1_request_table, ReqId) of
+    case ets:lookup(tl1_request_table, to_integer(ReqId)) of
 	[#request{ref = Ref, from = From}] ->
 	    Remaining = case (catch cancel_timer(Ref)) of
 		    Rem when is_integer(Rem) -> Rem;

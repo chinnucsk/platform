@@ -61,7 +61,7 @@ get_response_id(RespondId) ->
     Data = string:tokens(RespondId, " "),
     ReqId = lists:nth(2, Data),
     CompletionCode = lists:last(Data),
-    {to_integer(ReqId), CompletionCode}.
+    {ReqId, CompletionCode}.
 
 get_response_status([Status|Data]) ->
     ?INFO("get status :~p", [Status]),
@@ -115,7 +115,7 @@ get_status(Name, String) ->
 
 get_status_value([], Acc) ->
     {lists:reverse(Acc), ""};
-get_status_value([$\s|String], Acc) ->
+get_status_value([$\t|String], Acc) ->
     {lists:reverse(Acc), String};
 get_status_value([A|String], Acc) ->
     get_status_value(String, [A|Acc]).

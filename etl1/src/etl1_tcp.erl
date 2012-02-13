@@ -21,7 +21,7 @@
 
 -define(TIMEOUT, 12000).
 
--record(state, {host, port, username, password, socket, conn_state, rest = <<>>, data = []}).
+-record(state, {host, port, username, password, socket, conn_state, login_state, rest = <<>>, data = []}).
 
 -include("tl1.hrl").
 
@@ -35,6 +35,9 @@
 start_link(Name, NetIfOpts) ->
     ?INFO("start etl1_tcp....~p,~p",[Name, NetIfOpts]),
 	gen_server:start_link({local, Name},?MODULE, [NetIfOpts], []).
+
+login_state(Pid, LoginState) ->
+    gen_server:call(Pid, {login_state, LoginState}).
 
 get_status(Pid) ->
     gen_server:call(Pid, get_status).
@@ -70,7 +73,8 @@ do_init(Args) ->
     Password = proplists:get_value(password, Args, ?PASSWORD),
     {ok, Socket, ConnState} = connect(Host, Port, Username, Password),
     %%-- We are done ---
-    {ok, #state{host = Host, port = Port, username = Username, password = Password, socket = Socket, conn_state = ConnState}}.
+    {ok, #state{host = Host, port = Port, username = Username, password = Password,
+        socket = Socket, conn_state = ConnState}}.
 
 connect(Host, Port, Username, Password) when is_binary(Host) ->
     connect(binary_to_list(Host), Port, Username, Password);
@@ -79,7 +83,6 @@ connect(Host, Port, Username, Password) ->
     {ok, Socket} ->
         ?INFO("connect succ...~p,~p",[Host, Port]),
         login(Socket, Username, Password),
-        ?INFO("login succ...~p,~p",[Username, Password]),
         erlang:send_after(5 * 60 * 1000, self(), shakehand),
         {ok, Socket, connected};
     {error, Reason} ->
@@ -94,7 +97,7 @@ login(Socket, Username, Password) when is_binary(Password)->
     login(Socket, Username, binary_to_list(Password));
 login(Socket, Username, Password) ->
     ?INFO("begin to login,~p,~p,~p", [Socket, Username, Password]),
-    Cmd = lists:concat(["LOGIN:::CTAG::", "UN=", to_list(Username), ",PWD=", Password, ";"]),
+    Cmd = lists:concat(["LOGIN:::login::", "UN=", to_list(Username), ",PWD=", Password, ";"]),
     tcp_send(Socket, Cmd).
 
 %%--------------------------------------------------------------------
@@ -108,6 +111,10 @@ login(Socket, Username, Password) ->
 %%--------------------------------------------------------------------
 handle_call(get_status, _From, State) ->
     {reply, {ok, State}, State};
+
+handle_call({login_state, LoginState}, _From, State) ->
+    ?INFO("login state ...", [LoginState]),
+    {reply, ok, State#state{login_state = LoginState}};
 
 handle_call(stop, _From, State) ->
     ?INFO("received stop request", []),
@@ -163,7 +170,7 @@ handle_info({tcp_closed, Socket}, #state{socket = Socket, host = Host, port = Po
 
 
 handle_info(shakehand, #state{socket = Socket, conn_state = connected} = State) ->
-    tcp_send(Socket, "SHAKEHAND:::CTAG::;"),
+    tcp_send(Socket, "SHAKEHAND:::shakehand::;"),
     ?INFO("send shakehand...~p",[State]),
     erlang:send_after(5 * 60 * 1000, self(), shakehand),
     {noreply, State};
@@ -267,7 +274,14 @@ handle_recv_msg(Bytes, #state{data = Data}) ->
         noreply;
         
 %	{ok, _Vsn, #pdu{type = 'acknowledgment'} = Pdu, _MS, _ACM} ->
-
+    {ok, #pct{type = 'output',request_id = "shakehand", complete_code =CompletionCode} = Pct} ->
+        ok;
+    {ok, #pct{type = 'output',request_id = "login", complete_code =CompletionCode} = Pct} ->
+        LoginState = case CompletionCode of
+            "COMPLD" -> succ;
+            "DENY" -> fail
+        end,
+        login_state(self(), CompletionCode);
 	{ok, Pct} when is_record(Pct, pct) ->
         NewData = case Pct#pct.data of
             {ok, Data2} ->
