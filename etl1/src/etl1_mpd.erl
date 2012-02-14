@@ -46,13 +46,14 @@ process_msg(MsgData) ->
         {data, #tl1_response{fields = Fileds, records = Records}} ->
             {ok, to_tuple_records(Fileds, Records)};
         {error, Reason} ->
-            {error, Reason}
+            {error, [{en, En}, {endesc, Endesc}, {reason, Reason}]}
      end,
     Terminator = lists:last(Lines),
     ?INFO("req_id: ~p,comp_code: ~p, terminator: ~p, data:~p",[ReqId, CompletionCode, Terminator, RespondData]),
     Pct = #pct{type = 'output',
                request_id = ReqId,
                complete_code = CompletionCode,
+               en = En,
                data =  RespondData
                },
     {ok, Pct}.
@@ -160,7 +161,7 @@ to_tuple_records(_Fields, []) ->
 to_tuple_records(Fields, Records) ->
 	[to_tuple_record(Fields, Record) || Record <- Records].
 	
-to_tuple_record(Fields, Record) when length(Fields) =< length(Record) ->
+to_tuple_record(Fields, Record) when length(Fields) >= length(Record) ->
 	to_tuple_record(Fields, Record, []).
 
 to_tuple_record([], [], Acc) ->
@@ -168,6 +169,9 @@ to_tuple_record([], [], Acc) ->
 
 to_tuple_record([_F|FT], [undefined|VT], Acc) ->
 	to_tuple_record(FT, VT, Acc);
+
+to_tuple_record([F|FT], [], Acc) ->
+	to_tuple_record(FT, [], [{list_to_atom(F), []} | Acc]);
 
 to_tuple_record([F|FT], [V|VT], Acc) ->
 	to_tuple_record(FT, VT, [{list_to_atom(F), V} | Acc]).

@@ -83,7 +83,6 @@ connect(Host, Port, Username, Password) ->
     {ok, Socket} ->
         ?INFO("connect succ...~p,~p",[Host, Port]),
         login(Socket, Username, Password),
-        erlang:send_after(5 * 60 * 1000, self(), shakehand),
         {ok, Socket, connected};
     {error, Reason} ->
         ?WARNING("tcp connect failure: ~p", [Reason]),
@@ -135,7 +134,8 @@ handle_cast({send_req, Pct, _Cmd}, #state{conn_state = ConnState, host = Host, p
     {noreply, State};
 
 handle_cast({login_state, LoginState}, State) ->
-    ?INFO("login state ...~p", [LoginState]),
+    ?INFO("login state ...~p, ~p", [LoginState, self()]),
+    erlang:send_after(6 * 1000, self(), shakehand),
     {noreply, State#state{login_state = LoginState}};
 
 handle_cast(Msg, State) ->
@@ -264,7 +264,7 @@ handle_recv_wait(Bytes, _State) ->
 handle_recv_msg(Bytes, _State) when is_binary(Bytes) and (size(Bytes) == 0) ->
     ?WARNING("snmp error: ~p", [empty_message]),
     ok;
-handle_recv_msg(Bytes, #state{data = Data}) ->
+handle_recv_msg(Bytes, #state{data = Data, socket = Socket, username = Username, password = Password} = State) ->
     case (catch etl1_mpd:process_msg(Bytes)) of
 	%% BMK BMK BMK
 	%% Do we really need message size here??
@@ -281,7 +281,10 @@ handle_recv_msg(Bytes, #state{data = Data}) ->
             "COMPLD" -> succ;
             "DENY" -> fail
         end,
-        login_state(self(), CompletionCode);
+        login_state(self(), LoginState);
+    {ok, #pct{type = 'output', complete_code = "DENY", en = "AAFD"} = Pct} ->
+        ?WARNING("begin to relogin...~p", [State]),
+        login(Socket, Username, Password);
 	{ok, Pct} when is_record(Pct, pct) ->
         NewData = case Pct#pct.data of
             {ok, Data2} ->
@@ -289,9 +292,10 @@ handle_recv_msg(Bytes, #state{data = Data}) ->
             {error, _Reason} ->
                 {error, _Reason}
         end,
-        ?INFO("send tl1 data :~p", [NewData]),
+        ?INFO("send tl1 data :~p, ~p", [NewData, self()]),
         etl1 ! {tl1_tcp, Pct#pct{data = NewData}};
-    
+
+
 	Error ->
 	    ?ERROR("processing of received message failed: ~n ~p", [Error]),
 	    ok
