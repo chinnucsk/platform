@@ -37,10 +37,10 @@ start_link(Name, NetIfOpts) ->
 	gen_server:start_link({local, Name},?MODULE, [NetIfOpts], []).
 
 login_state(Pid, LoginState) ->
-    gen_server:call(Pid, {login_state, LoginState}).
+    gen_server:cast(Pid, {login_state, LoginState}).
 
 get_status(Pid) ->
-    gen_server:call(Pid, get_status).
+    gen_server:call(Pid, get_status, 6000).
 
 send_tcp(Pid, Ptc)  ->
     gen_server:cast(Pid, Ptc).
@@ -112,10 +112,6 @@ login(Socket, Username, Password) ->
 handle_call(get_status, _From, State) ->
     {reply, {ok, State}, State};
 
-handle_call({login_state, LoginState}, _From, State) ->
-    ?INFO("login state ...", [LoginState]),
-    {reply, ok, State#state{login_state = LoginState}};
-
 handle_call(stop, _From, State) ->
     ?INFO("received stop request", []),
     {stop, normal, State};
@@ -137,6 +133,10 @@ handle_cast({send_req, Pct, Cmd}, #state{conn_state = connected} = State) ->
 handle_cast({send_req, Pct, _Cmd}, #state{conn_state = ConnState, host = Host, port = Port} = State) ->
     etl1 ! {tl1_error, Pct, {conn_failed, ConnState, Host, Port}},
     {noreply, State};
+
+handle_cast({login_state, LoginState}, State) ->
+    ?INFO("login state ...~p", [LoginState]),
+    {noreply, State#state{login_state = LoginState}};
 
 handle_cast(Msg, State) ->
     ?WARNING("unexpected message: ~n~p", [Msg]),
@@ -276,7 +276,7 @@ handle_recv_msg(Bytes, #state{data = Data}) ->
 %	{ok, _Vsn, #pdu{type = 'acknowledgment'} = Pdu, _MS, _ACM} ->
     {ok, #pct{type = 'output',request_id = "shakehand", complete_code =CompletionCode} = Pct} ->
         ok;
-    {ok, #pct{type = 'output',request_id = "login", complete_code =CompletionCode} = Pct} ->
+    {ok, #pct{type = 'output',request_id = "login", complete_code =CompletionCode}} ->
         LoginState = case CompletionCode of
             "COMPLD" -> succ;
             "DENY" -> fail

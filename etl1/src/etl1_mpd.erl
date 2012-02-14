@@ -111,12 +111,14 @@ get_status(Name, String) ->
             Rest = string:substr(String, N + length(Name)),
             ?INFO("rest :~p", [Rest]),
             get_status_value(Rest, [])
-        end.
+    end.
 
 get_status_value([], Acc) ->
     {lists:reverse(Acc), ""};
 get_status_value([$\t|String], Acc) ->
     {lists:reverse(Acc), String};
+get_status_value([$\s,$E,$N|String], Acc) -> %endesc
+    {lists:reverse(Acc), [$E,$N|String]};
 get_status_value([A|String], Acc) ->
     get_status_value(String, [A|Acc]).
 
