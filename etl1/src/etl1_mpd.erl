@@ -1,6 +1,6 @@
 -module(etl1_mpd).
 
--author("hejin-03-24").
+-author("hejin 2011-03-24").
 
 -export([process_msg/1, generate_msg/2]).
 
@@ -18,16 +18,6 @@
 
 -record(tl1_response, {en, endesc, fields, records}).
 
-%%-----------------------------------------------------------------
-%% Func: process_msg(Packet, TDomain, TAddress, State) ->
-%%       {ok, SnmpVsn, Pdu, PduMS, ACMData} | {discarded, Reason}
-%% Types: Packet = binary()
-%%        TDomain = snmpUDPDomain | atom()
-%%        TAddress = {Ip, Udp}
-%%        State = #state
-%% Purpose: This is the main Message Dispatching function. (see
-%%          section 4.2.1 in rfc2272)
-%%-----------------------------------------------------------------
 %   ZTE_192.168.41.10 2011-07-19 16:45:35
 %   M  CTAG DENY
 process_msg(MsgData) ->
@@ -46,7 +36,7 @@ process_msg(MsgData) ->
         {data, #tl1_response{fields = Fileds, records = Records}} ->
             {ok, to_tuple_records(Fileds, Records)};
         {error, Reason} ->
-            {error, [{en, En}, {endesc, Endesc}, {reason, Reason}]}
+            {error, {tl1_cmd_error, [{en, En}, {endesc, Endesc}, {reason, Reason}]}}
      end,
     Terminator = lists:last(Lines),
     ?INFO("req_id: ~p,comp_code: ~p, terminator: ~p, data:~p",[ReqId, CompletionCode, Terminator, RespondData]),

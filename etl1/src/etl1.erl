@@ -21,9 +21,9 @@
 
 -define(RETRIES, 2).
 
--define(REQ_TIMEOUT, 26000).
+-define(REQ_TIMEOUT, 56000).
 
--define(CALL_TIMEOUT, 30000).
+-define(CALL_TIMEOUT, 60000).
 
 -import(extbif, [to_list/1, to_binary/1, to_integer/1]).
 
@@ -53,14 +53,10 @@ input(Type, Cmd) ->
 
 input(Type, Cmd, Timeout) when is_tuple(Type)->
     case gen_server:call(?MODULE, {sync_input, self(), Type, Cmd, Timeout}, ?CALL_TIMEOUT) of
-        {ok, {CompCode, {error, Reason}}, _} ->
-            %send after : {error,  " EN=DDNS ENDESC=port may not support this operation: -Port-4,;"}
-            {error, {cmd_error, Cmd, CompCode ++ Reason}};
         {ok, {_CompCode, Data}, _} ->
-            %Data :{ok ,Value} |
+            %Data :{ok , [Values]} | {ok, [[{en, En},{endesc, Endesc}]]}
+            %send after : {error, {tl1_cmd_error, [{en, En},{endesc, Endesc},{reason, Reason}]}}
             Data;
-        {ok, Error, _} ->
-            {error, Error};
         {error, Reason} ->
             %send before: {error, {invalid_request, Req}} | {error, no_ctag} | {error, too_big} | {error, {'EXIT',Reason }} | {error, {conn_failed, ConnState, Host, Port}}
             %sending    : {error, {tcp_send_error, Reason}} | {error, {tcp_send_exception, Error}}

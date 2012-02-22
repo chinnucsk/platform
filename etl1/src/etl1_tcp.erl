@@ -244,7 +244,7 @@ tcp_send(Pct, Sock, Msg) ->
     end.
 
 send_failed(Pct, ERROR) ->
-    etc1 ! {tl1_error, Pct, ERROR}.
+    etl1 ! {tl1_error, Pct, ERROR}.
 
 %% receive
 handle_recv_wait(Bytes, _State) ->
@@ -274,7 +274,10 @@ handle_recv_msg(Bytes, #state{data = Data, socket = Socket, username = Username,
         noreply;
         
 %	{ok, _Vsn, #pdu{type = 'acknowledgment'} = Pdu, _MS, _ACM} ->
-    {ok, #pct{type = 'output',request_id = "shakehand", complete_code =CompletionCode} = Pct} ->
+    {ok, #pct{type = 'output', complete_code = "DENY", en = "AAFD"}} ->
+        ?WARNING("begin to relogin...~p", [State]),
+        login(Socket, Username, Password);
+    {ok, #pct{type = 'output',request_id = "shakehand", complete_code =CompletionCode}} ->
         ok;
     {ok, #pct{type = 'output',request_id = "login", complete_code =CompletionCode}} ->
         LoginState = case CompletionCode of
@@ -282,9 +285,6 @@ handle_recv_msg(Bytes, #state{data = Data, socket = Socket, username = Username,
             "DENY" -> fail
         end,
         login_state(self(), LoginState);
-    {ok, #pct{type = 'output', complete_code = "DENY", en = "AAFD"} = Pct} ->
-        ?WARNING("begin to relogin...~p", [State]),
-        login(Socket, Username, Password);
 	{ok, Pct} when is_record(Pct, pct) ->
         NewData = case Pct#pct.data of
             {ok, Data2} ->
