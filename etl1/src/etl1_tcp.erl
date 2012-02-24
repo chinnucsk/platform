@@ -157,7 +157,7 @@ handle_info({tcp, Sock, Bytes}, #state{socket = Sock, rest = Rest, data = Data} 
     {NewData, NewRest} = case binary:last(Bytes) of
         $; ->
             NowBytes = binary:split(list_to_binary([Rest, Bytes]), <<">">>, [global]),
-            {OtherBytes, LastBytes} = lists:split(length(NowBytes)-1, NowBytes),
+            {OtherBytes, [LastBytes]} = lists:split(length(NowBytes)-1, NowBytes),
             NowData = handle_recv_wait(OtherBytes),
             handle_recv_msg(LastBytes, State#state{data = Data ++ NowData}),
             {[], <<>>};
@@ -232,7 +232,6 @@ handle_send_tcp(Pct, MsgData, #state{socket = Sock}) ->
 tcp_send(Sock, Msg) ->
     case (catch gen_tcp:send(Sock, Msg)) of
 	ok ->
-	    ?INFO("sent cmd  to :~p", [Msg]),
 	    ok;
 	Error ->
 	    ?ERROR("failed sending message to ~n   ~p",[Error])
@@ -269,14 +268,14 @@ handle_recv_wait(Bytes, Data) when is_binary(Bytes)->
     case (catch etl1_mpd:process_msg(Bytes)) of
 	{ok, Pct} when is_record(Pct, pct) ->
         case Pct#pct.data of
-            {ok, Data} ->
-                Data;
+            {ok, Data0} ->
+                Data ++ Data0;
             {error, _Reason} ->
-                []
+                Data
         end ;
 	Error ->
 	    ?ERROR("processing of received message failed: ~n ~p", [Error]),
-	    []
+	    Data
     end.
 
 handle_recv_msg(<<>>, _State)  ->
