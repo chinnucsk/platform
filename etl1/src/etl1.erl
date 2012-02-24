@@ -119,8 +119,7 @@ do_connect(Tl1Info) ->
     ?INFO("get tl1 info:~p", [Tl1Info]),
     Type = proplists:get_value(manu, Tl1Info),
     CityId = proplists:get_value(cityid, Tl1Info, <<"">>),
-    Name = list_to_atom(lists:concat(["etl1_tcp_", to_list(Type), "_", to_list(CityId)])),
-    case etl1_tcp:start_link(Name, Tl1Info) of
+    case etl1_tcp:start_link(Tl1Info) of
         {ok, Pid} ->
             {{to_list(Type), to_list(CityId)}, Pid};
         {error, Error} ->
@@ -155,7 +154,6 @@ handle_call({sync_input, Send, Type, Cmd, Timeout}, From, #state{tl1_tcp = Pids}
         [Pid] ->
             case (catch handle_sync_input(Pid, Cmd, Timeout, From, State)) of
                 {ok, NewState} ->
-                    ?INFO("has input, state:~p",[NewState]),
                     {noreply, NewState};
                 Error ->
                     ?ERROR("error:~p, state:~p",[Error, State]),
@@ -190,10 +188,10 @@ handle_cast(Msg, State) ->
 %%          {stop, Reason, State}            (terminate/2 is called)
 %%--------------------------------------------------------------------
 handle_info({sync_timeout, ReqId, From}, State) ->
-    %?WARNING("received sync_timeout [~w] message", [ReqId]),
+    ?WARNING("received sync_timeout [~w] message", [ReqId]),
     case ets:lookup(tl1_request_table, ReqId) of
 	[#request{from = From, data = Data} = _Req0] ->
-	    gen_server:reply(From, {error, {tl1_timeout, Data}}),
+	    gen_server:reply(From, {error, {tl1_timeout, [ReqId, Data]}}),
 	    ets:delete(tl1_request_table, ReqId);
 	_ ->
         ?WARNING("cannot lookup request: ~p", [ReqId])
@@ -274,7 +272,7 @@ handle_tl1_error(#pct{request_id = ReqId} = _Pct, Reason) ->
 
 %% receive
 handle_recv_tcp(#pct{type = 'output', request_id = ReqId, complete_code = CompCode, data = Data} = _Pct,  _State) ->
-    ?INFO("recv tcp reqid:~p, code:~p, data:~p",[ReqId, CompCode, Data]),
+%    ?INFO("recv tcp reqid:~p, code:~p, data:~p",[ReqId, CompCode, Data]),
     case ets:lookup(tl1_request_table, to_integer(ReqId)) of
 	[#request{ref = Ref, from = From}] ->
 	    Remaining = case (catch cancel_timer(Ref)) of
@@ -289,6 +287,7 @@ handle_recv_tcp(#pct{type = 'output', request_id = ReqId, complete_code = CompCo
 	    ets:delete(tl1_request_table, ReqId),
 	    ok;
 	_ ->
+        ?ERROR("cannot find request_id :~p", [ReqId]),
         ok
 	end;
 handle_recv_tcp(CrapPdu, _State) ->

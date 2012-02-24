@@ -5,7 +5,7 @@
 -behaviour(gen_server).
 
 %% Network Interface callback functions
--export([start_link/2, 
+-export([start_link/1, start_link/2,
         get_status/1,
         send_tcp/2]).
 
@@ -32,9 +32,13 @@
 %%%-------------------------------------------------------------------
 %%% API
 %%%-------------------------------------------------------------------
+start_link(NetIfOpts) ->
+    ?INFO("start etl1_tcp....~p",[NetIfOpts]),
+	gen_server:start_link(?MODULE, [NetIfOpts], []).
+
 start_link(Name, NetIfOpts) ->
     ?INFO("start etl1_tcp....~p,~p",[Name, NetIfOpts]),
-	gen_server:start_link({local, Name},?MODULE, [NetIfOpts], []).
+	gen_server:start_link({local, Name}, ?MODULE, [NetIfOpts], []).
 
 login_state(Pid, LoginState) ->
     gen_server:cast(Pid, {login_state, LoginState}).
@@ -152,12 +156,15 @@ handle_info({tcp, Sock, Bytes}, #state{socket = Sock, rest = Rest, data = Data} 
     ?INFO("received tcp ~p ", [Bytes]),
     {NewData, NewRest} = case binary:last(Bytes) of
         $; ->
-            handle_recv_msg(list_to_binary([Rest, Bytes]), State),
+            NowBytes = binary:split(list_to_binary([Rest, Bytes]), <<">">>, [global]),
+            {OtherBytes, LastBytes} = lists:split(length(NowBytes)-1, NowBytes),
+            NowData = handle_recv_wait(OtherBytes),
+            handle_recv_msg(LastBytes, State#state{data = Data ++ NowData}),
             {[], <<>>};
         $> ->
-            NowData = handle_recv_wait(list_to_binary([Rest, Bytes]), State),
-            ?INFO("get now data :~p",[NowData]),
-            {NowData, <<>>};
+            NowBytes = binary:split(list_to_binary([Rest, Bytes]), <<">">>, [global]),
+            NowData = handle_recv_wait(NowBytes),
+            {Data ++ NowData, <<>>};
         _ ->
             {Data, list_to_binary([Rest, Bytes])}
        end,
@@ -171,12 +178,12 @@ handle_info({tcp_closed, Socket}, #state{socket = Socket, host = Host, port = Po
 
 handle_info(shakehand, #state{socket = Socket, conn_state = connected} = State) ->
     tcp_send(Socket, "SHAKEHAND:::shakehand::;"),
-    ?INFO("send shakehand...~p",[State]),
+%    ?INFO("send shakehand...~p",[State]),
     erlang:send_after(5 * 60 * 1000, self(), shakehand),
     {noreply, State};
 
 handle_info(shakehand, State) ->
-    ?INFO("ignore shakehand...~p",[State]),
+%    ?INFO("ignore shakehand...~p",[State]),
     {noreply, State};
 
 handle_info({timeout, retry_connect},  #state{host = Host, port = Port, username = Username, password = Password} = State) ->
@@ -209,6 +216,7 @@ code_change(_Vsn, State, _Extra) ->
 retry_connect() ->
     erlang:send_after(30000, self(), {timeout, retry_connect}).
 
+
 %% send
 handle_send_tcp(Pct, MsgData, #state{socket = Sock}) ->
     case (catch etl1_mpd:generate_msg(Pct, MsgData)) of
@@ -233,7 +241,7 @@ tcp_send(Sock, Msg) ->
 tcp_send(Pct, Sock, Msg) ->
     case (catch gen_tcp:send(Sock, Msg)) of
 	ok ->
-	    ?INFO("sent cmd  to :~p", [Msg]),
+	    ?INFO("send cmd  to :~p", [Msg]),
 	    ok;
 	{error, Reason} ->
 	    ?ERROR("failed sending message to ~p",[Reason]),
@@ -247,7 +255,17 @@ send_failed(Pct, ERROR) ->
     etl1 ! {tl1_error, Pct, ERROR}.
 
 %% receive
-handle_recv_wait(Bytes, _State) ->
+handle_recv_wait(Bytes) ->
+    handle_recv_wait(Bytes, []).
+
+handle_recv_wait([], Data) ->
+    Data;
+handle_recv_wait([A|Bytes], Data) when is_list(Bytes)->
+    handle_recv_wait(Bytes, Data ++ handle_recv_wait(A, []));
+
+handle_recv_wait(<<>>, Data) ->
+    Data;
+handle_recv_wait(Bytes, Data) when is_binary(Bytes)->
     case (catch etl1_mpd:process_msg(Bytes)) of
 	{ok, Pct} when is_record(Pct, pct) ->
         case Pct#pct.data of
@@ -261,8 +279,7 @@ handle_recv_wait(Bytes, _State) ->
 	    []
     end.
 
-handle_recv_msg(Bytes, _State) when is_binary(Bytes) and (size(Bytes) == 0) ->
-    ?WARNING("snmp error: ~p", [empty_message]),
+handle_recv_msg(<<>>, _State)  ->
     ok;
 handle_recv_msg(Bytes, #state{data = Data, socket = Socket, username = Username, password = Password} = State) ->
     case (catch etl1_mpd:process_msg(Bytes)) of
@@ -277,7 +294,7 @@ handle_recv_msg(Bytes, #state{data = Data, socket = Socket, username = Username,
     {ok, #pct{type = 'output', complete_code = "DENY", en = "AAFD"}} ->
         ?WARNING("begin to relogin...~p", [State]),
         login(Socket, Username, Password);
-    {ok, #pct{type = 'output',request_id = "shakehand", complete_code =CompletionCode}} ->
+    {ok, #pct{type = 'output',request_id = "shakehand", complete_code =_CompletionCode}} ->
         ok;
     {ok, #pct{type = 'output',request_id = "login", complete_code =CompletionCode}} ->
         LoginState = case CompletionCode of
@@ -292,9 +309,7 @@ handle_recv_msg(Bytes, #state{data = Data, socket = Socket, username = Username,
             {error, _Reason} ->
                 {error, _Reason}
         end,
-        ?INFO("send tl1 data :~p, ~p", [NewData, self()]),
         etl1 ! {tl1_tcp, Pct#pct{data = NewData}};
-
 
 	Error ->
 	    ?ERROR("processing of received message failed: ~n ~p", [Error]),

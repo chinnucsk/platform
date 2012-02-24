@@ -20,16 +20,19 @@
 
 %   ZTE_192.168.41.10 2011-07-19 16:45:35
 %   M  CTAG DENY
-process_msg(MsgData) ->
+process_msg(MsgData) when is_binary(MsgData) ->
     ?INFO("get respond :~p", [MsgData]),
     Lines = string:tokens(to_list(MsgData), "\r\n"),
+    process_msg(Lines);
+
+process_msg(Lines) ->
     ?INFO("get respond splite :~p", [Lines]),
     _Header = lists:nth(1, Lines),
     RespondId = lists:nth(2, Lines),
     {ReqId, CompletionCode} = get_response_id(RespondId),
     RespondBlock = lists:nthtail(2, Lines),
     {{En, Endesc}, Rest} = get_response_status(RespondBlock),
-    ?INFO("get en endesc :~p data:~p",[{En,Endesc}, Rest]),
+%    ?INFO("get en endesc :~p data:~p",[{En,Endesc}, Rest]),
     RespondData = case get_response(CompletionCode, Rest) of
         no_data ->
             {ok, [[{en, En}, {endesc, Endesc}]]};
