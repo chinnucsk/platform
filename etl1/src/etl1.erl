@@ -21,9 +21,9 @@
 
 -define(RETRIES, 2).
 
--define(REQ_TIMEOUT, 56000).
+-define(REQ_TIMEOUT, 60000).
 
--define(CALL_TIMEOUT, 60000).
+-define(CALL_TIMEOUT, 62000).
 
 -import(extbif, [to_list/1, to_binary/1, to_integer/1]).
 
