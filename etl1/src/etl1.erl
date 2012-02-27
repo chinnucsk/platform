@@ -274,14 +274,14 @@ handle_tl1_error(#pct{request_id = ReqId} = _Pct, Reason) ->
 handle_recv_tcp(#pct{type = 'output', request_id = ReqId, complete_code = CompCode, data = Data} = _Pct,  _State) ->
 %    ?INFO("recv tcp reqid:~p, code:~p, data:~p",[ReqId, CompCode, Data]),
     case ets:lookup(tl1_request_table, to_integer(ReqId)) of
-	[#request{ref = Ref, from = From}] ->
+	[#request{ref = Ref, data = Cmd, from = From}] ->
 	    Remaining = case (catch cancel_timer(Ref)) of
 		    Rem when is_integer(Rem) -> Rem;
 		    _ -> 0
 		end,
 	    OutputData = {CompCode, Data},
-	    Reply = {ok, OutputData, Remaining},
-        ?INFO("tcp reply:~p, from:~p",[Reply, From]),
+	    Reply = {ok, OutputData, {ReqId, Remaining}},
+        ?INFO("tcp req:~p, from:~p, cmd :~p",[{ReqId, Remaining}, From,Cmd]),
         %TODO Terminator判断是否结束，然后回复，需要reqid是否一致，下一个包是否有head，目的多次信息收集，一次返回
 	    gen_server:reply(From, Reply),
 	    ets:delete(tl1_request_table, ReqId),
