@@ -219,13 +219,14 @@ retry_connect() ->
 
 %% send
 handle_send_tcp(Pct, MsgData, #state{socket = Sock}) ->
-    case (catch etl1_mpd:generate_msg(Pct, MsgData)) of
+    try etl1_mpd:generate_msg(Pct, MsgData) of
 	{ok, Msg} ->
-	    ?DEBUG("handle_send_req -> message generated", []),
 	    tcp_send(Pct, Sock, Msg);
 	{discarded, Reason} ->
-        send_failed(Pct, Reason);
-     ERROR ->
+        send_failed(Pct, Reason)
+     catch
+        ERROR:Exception ->
+        ?ERROR("exception: ~p, ~n ~p", [Exception, erlang:get_stacktrace()]),
         send_failed(Pct, ERROR)
     end.
 

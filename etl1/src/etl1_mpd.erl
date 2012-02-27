@@ -58,15 +58,12 @@ get_response_id(RespondId) ->
     {ReqId, CompletionCode}.
 
 get_response_status([Status|Data]) ->
-    ?INFO("get status :~p", [Status]),
     {En, Rest} = get_status("EN=", Status),
-    ?INFO("get en :~p, ~p", [En, Rest]),
     case En of
         false ->
             {{false, false}, [Status|Data]};
         _ ->
-            {Endesc, Rest1} = get_status("ENDESC=", Rest),
-            ?INFO("get endesc :~p, ~p", [En, Rest1]),
+            {Endesc, _Rest1} = get_status("ENDESC=", Rest),
             {{En, Endesc}, Data}
      end.       
 
@@ -103,7 +100,6 @@ get_status(Name, String) ->
             {false, ""};
         N ->
             Rest = string:substr(String, N + length(Name)),
-            ?INFO("rest :~p", [Rest]),
             get_status_value(Rest, [])
     end.
 
@@ -175,13 +171,8 @@ to_tuple_record([F|FT], [V|VT], Acc) ->
 %% Generate a message
 %%-----------------------------------------------------------------
 generate_msg(Pct, MsgData) ->
-    if length(MsgData) =< ?max_message_size ->
-            Cmd = to_list(MsgData),
-            case re:replace(Cmd, "CTAG", to_list(Pct#pct.request_id), [global,{return, list}]) of
-                Cmd -> {discarded, no_ctag};
-                NewString -> {ok, NewString}
-            end;
-       true ->
-            ?INFO("msg size :~p", [size(MsgData)]),
-           {discarded, too_big}
+    Cmd = to_list(MsgData),
+    case re:replace(Cmd, "CTAG", to_list(Pct#pct.request_id), [global,{return, list}]) of
+        Cmd -> {discarded, no_ctag};
+        NewString -> {ok, NewString}
     end.
