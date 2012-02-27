@@ -225,9 +225,9 @@ handle_send_tcp(Pct, MsgData, #state{socket = Sock}) ->
 	{discarded, Reason} ->
         send_failed(Pct, Reason)
      catch
-        ERROR:Exception ->
-        ?ERROR("exception: ~p, ~n ~p", [Exception, erlang:get_stacktrace()]),
-        send_failed(Pct, ERROR)
+        Error:Exception ->
+        ?ERROR("exception: ~p, ~n ~p", [{Error, Exception}, erlang:get_stacktrace()]),
+        send_failed(Pct, {'EXIT',Exception})
     end.
 
 tcp_send(Sock, Msg) ->

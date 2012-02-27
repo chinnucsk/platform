@@ -58,12 +58,13 @@ input(Type, Cmd, Timeout) when is_tuple(Type)->
             %send after : {error, {tl1_cmd_error, [{en, En},{endesc, Endesc},{reason, Reason}]}}
             Data;
         {error, Reason} ->
-            %send before: {error, {invalid_request, Req}} | {error, no_ctag} | {error, too_big} | {error, {'EXIT',Reason }} | {error, {conn_failed, ConnState, Host, Port}}
+            %send before: {error, {invalid_request, Req}} | {error, no_ctag} | {error, {no_type, Type}}
+            %             {error, {'EXIT',Reason }} | {error, {conn_failed, ConnState, Host, Port}}
             %sending    : {error, {tcp_send_error, Reason}} | {error, {tcp_send_exception, Error}}
             %send after : {error, {tl1_timeout, Data}}
             {error, Reason};
         Error ->
-            % {no_type, Type} | {many_type, Type} | {'EXIT',{badarith,_}}
+            %{'EXIT',{badarith,_}}
             {error, Error}
 	end;
 input(Type, Cmd, Timeout) ->
@@ -151,6 +152,9 @@ handle_call({set_tl1, Tl1Info}, _From, #state{tl1_tcp = Pids} = State) ->
 handle_call({sync_input, Send, Type, Cmd, Timeout}, From, #state{tl1_tcp = Pids} = State) ->
     ?INFO("handle_call,Pid:~p,from:~p, Cmd,~p", [{Send, node(Send)}, From, Cmd]),
     case get_tl1_tcp(Type, Pids) of
+        [] ->
+            ?ERROR("error:type:~p, state:~p",[Type,State]),
+            {reply, {error, {no_type, Type}}, State};
         [Pid] ->
             case (catch handle_sync_input(Pid, Cmd, Timeout, From, State)) of
                 {ok, NewState} ->
@@ -158,13 +162,7 @@ handle_call({sync_input, Send, Type, Cmd, Timeout}, From, #state{tl1_tcp = Pids}
                 Error ->
                     ?ERROR("error:~p, state:~p",[Error, State]),
                     {reply, Error, State}
-            end;
-        [] ->
-            ?ERROR("error:type:~p, state:~p",[Type,State]),
-            {reply, {no_type, Type}, State};
-        _ ->
-            ?ERROR("tl1 connect too much,type:~p, state:~p",[Type,State]),
-            {reply, {many_type, Type}, State}
+            end
      end;
 
 handle_call(Req, _From, State) ->
@@ -194,7 +192,7 @@ handle_info({sync_timeout, ReqId, From}, State) ->
 	    gen_server:reply(From, {error, {tl1_timeout, [ReqId, Data]}}),
 	    ets:delete(tl1_request_table, ReqId);
 	_ ->
-        ?WARNING("cannot lookup request: ~p", [ReqId])
+        ?ERROR("cannot lookup request: ~p", [ReqId])
     end,
     {noreply, State};
 
@@ -236,13 +234,13 @@ code_change(_Vsn, State, _Extra) ->
 %%%-------------------------------------------------------------------
 %% send
 handle_sync_input(Pid, Cmd, Timeout, From, #state{req_id = ReqId} = State) ->
-    ?INFO("cmd, state:~p,~p",[Cmd, State]),
     NextReqId = 
         if ReqId == 1000 * 1000 ->
            0;
          true ->
             ReqId + 1
         end,
+    ?INFO("input cmd:~p, reqid: ~p, state:~p",[Cmd, NextReqId, State]),
     Session = #pct{type = 'input',
                request_id = NextReqId,
                complete_code = 'REQ',
@@ -267,7 +265,7 @@ handle_tl1_error(#pct{request_id = ReqId} = _Pct, Reason) ->
 	    ets:delete(tl1_request_table, ReqId),
 	    ok;
 	_ ->
-		?ERROR("unexpected tl1 error: ~p, ~p",[ReqId, Reason])
+		?ERROR("unexpected tl1, reqid: ~p, error: ~p",[ReqId, Reason])
     end.
 
 %% receive
@@ -281,13 +279,13 @@ handle_recv_tcp(#pct{type = 'output', request_id = ReqId, complete_code = CompCo
 		end,
 	    OutputData = {CompCode, Data},
 	    Reply = {ok, OutputData, {ReqId, Remaining}},
-        ?INFO("tcp req:~p, from:~p, cmd :~p",[{ReqId, Remaining}, From,Cmd]),
+        ?INFO("recv tcp reqid:~p, from:~p, cmd :~p",[{ReqId, Remaining}, From,Cmd]),
         %TODO Terminator判断是否结束，然后回复，需要reqid是否一致，下一个包是否有head，目的多次信息收集，一次返回
 	    gen_server:reply(From, Reply),
 	    ets:delete(tl1_request_table, ReqId),
 	    ok;
 	_ ->
-        ?ERROR("cannot find request_id :~p", [ReqId]),
+        ?ERROR("cannot find reqid:~p", [ReqId]),
         ok
 	end;
 handle_recv_tcp(CrapPdu, _State) ->
@@ -301,4 +299,10 @@ cancel_timer(Ref) ->
     (catch erlang:cancel_timer(Ref)).
 
 get_tl1_tcp({Type, City}, Pids) ->
-    [Pid || {{T, C}, Pid} <- Pids, {T, C} == {to_list(Type), to_list(City)}].
+    GetPids = [Pid || {{T, C}, Pid} <- Pids, {T, C} == {to_list(Type), to_list(City)}],
+    case length(GetPids) of
+        false ->
+            GetPids;
+        true ->
+            [lists:nth(random:uniform(length(GetPids)), GetPids)]
+    end.

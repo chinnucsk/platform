@@ -42,7 +42,7 @@ process_msg(Lines) ->
             {error, {tl1_cmd_error, [{en, En}, {endesc, Endesc}, {reason, Reason}]}}
      end,
     Terminator = lists:last(Lines),
-    ?INFO("req_id: ~p,comp_code: ~p, terminator: ~p, data:~p",[ReqId, CompletionCode, Terminator, RespondData]),
+    ?INFO("reqid: ~p,comp_code: ~p, terminator: ~p, data:~p",[ReqId, CompletionCode, Terminator, RespondData]),
     Pct = #pct{type = 'output',
                request_id = ReqId,
                complete_code = CompletionCode,
