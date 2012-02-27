@@ -300,7 +300,7 @@ cancel_timer(Ref) ->
 
 get_tl1_tcp({Type, City}, Pids) ->
     GetPids = [Pid || {{T, C}, Pid} <- Pids, {T, C} == {to_list(Type), to_list(City)}],
-    case length(GetPids) of
+    case length(GetPids) > 1 of
         false ->
             GetPids;
         true ->
