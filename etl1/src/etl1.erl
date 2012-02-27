@@ -27,7 +27,7 @@
 
 -import(extbif, [to_list/1, to_binary/1, to_integer/1]).
 
--record(request,  {id, type, data, ref, from}).
+-record(request,  {id, type, data, ref, timeout, time, from}).
 
 -record(state, {tl1_tcp, req_id=0}).
 
@@ -107,6 +107,7 @@ init([Tl1Options]) ->
 do_init(Tl1Options) ->
     process_flag(trap_exit, true),
     ets:new(tl1_request_table, [set, named_table, protected, {keypos, #request.id}]),
+    ets:new(tl1_request_timeout, [set, named_table, protected, {keypos, #request.id}]),
     Pids = connect_tl1(Tl1Options),
     {ok, Pids}.
 
@@ -188,11 +189,12 @@ handle_cast(Msg, State) ->
 handle_info({sync_timeout, ReqId, From}, State) ->
     ?WARNING("received sync_timeout [~w] message", [ReqId]),
     case ets:lookup(tl1_request_table, ReqId) of
-	[#request{from = From, data = Data} = _Req0] ->
+	[#request{from = From, data = Data} = Req] ->
 	    gen_server:reply(From, {error, {tl1_timeout, [ReqId, Data]}}),
+	    ets:insert(tl1_request_timeout, Req),
 	    ets:delete(tl1_request_table, ReqId);
 	_ ->
-        ?ERROR("cannot lookup request: ~p", [ReqId])
+        ?ERROR("cannot lookup reqid:~p", [ReqId])
     end,
     {noreply, State};
 
@@ -240,7 +242,7 @@ handle_sync_input(Pid, Cmd, Timeout, From, #state{req_id = ReqId} = State) ->
          true ->
             ReqId + 1
         end,
-    ?INFO("input cmd:~p, reqid: ~p, state:~p",[Cmd, NextReqId, State]),
+    ?INFO("input reqid:~p, cmd:~p, state:~p",[NextReqId, Cmd, State]),
     Session = #pct{type = 'input',
                request_id = NextReqId,
                complete_code = 'REQ',
@@ -252,6 +254,8 @@ handle_sync_input(Pid, Cmd, Timeout, From, #state{req_id = ReqId} = State) ->
               type    = iuput,
               data    = Cmd,
               ref     = Ref,
+              time    = extbif:timestamp(),
+              timeout = Timeout,
               from    = From},
     ets:insert(tl1_request_table, Req),
     {ok, State#state{req_id = NextReqId}}.
@@ -265,28 +269,34 @@ handle_tl1_error(#pct{request_id = ReqId} = _Pct, Reason) ->
 	    ets:delete(tl1_request_table, ReqId),
 	    ok;
 	_ ->
-		?ERROR("unexpected tl1, reqid: ~p, error: ~p",[ReqId, Reason])
+		?ERROR("unexpected tl1, reqid:~p, error: ~p",[ReqId, Reason])
     end.
 
 %% receive
 handle_recv_tcp(#pct{type = 'output', request_id = ReqId, complete_code = CompCode, data = Data} = _Pct,  _State) ->
 %    ?INFO("recv tcp reqid:~p, code:~p, data:~p",[ReqId, CompCode, Data]),
     case ets:lookup(tl1_request_table, to_integer(ReqId)) of
-	[#request{ref = Ref, data = Cmd, from = From}] ->
+	[#request{ref = Ref, data = Cmd, timeout = Timeout, from = From}] ->
 	    Remaining = case (catch cancel_timer(Ref)) of
 		    Rem when is_integer(Rem) -> Rem;
 		    _ -> 0
 		end,
 	    OutputData = {CompCode, Data},
-	    Reply = {ok, OutputData, {ReqId, Remaining}},
-        ?INFO("recv tcp reqid:~p, from:~p, cmd :~p",[{ReqId, Remaining/1000}, From,Cmd]),
+	    Reply = {ok, OutputData, {ReqId, Timeout - Remaining}},
+        ?INFO("recv tcp reqid:~p, from:~p, cmd :~p",[{ReqId, (Timeout - Remaining)/1000}, From,Cmd]),
         %TODO Terminator判断是否结束，然后回复，需要reqid是否一致，下一个包是否有head，目的多次信息收集，一次返回
 	    gen_server:reply(From, Reply),
 	    ets:delete(tl1_request_table, ReqId),
 	    ok;
 	_ ->
-        ?ERROR("cannot find reqid:~p", [ReqId]),
-        ok
+        case ets:lookup(tl1_request_timeout, to_integer(ReqId)) of
+            [#request{data = Cmd, time = Time, from = From}] ->
+                Now = extbif:timestamp(),
+                ?ERROR("cannot find reqid:~p, time:~p, cmd:~p", [ReqId, Now - Time, Cmd]),
+                ets:delete(tl1_request_timeout, ReqId);
+             _ ->
+                ?ERROR("cannot find reqid:~p", [ReqId])
+        end
 	end;
 handle_recv_tcp(CrapPdu, _State) ->
     ?ERROR("received crap (snmp) Pdu from ~w:~w =>~p", [CrapPdu]),
