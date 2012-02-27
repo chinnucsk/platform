@@ -279,7 +279,7 @@ handle_recv_tcp(#pct{type = 'output', request_id = ReqId, complete_code = CompCo
 		end,
 	    OutputData = {CompCode, Data},
 	    Reply = {ok, OutputData, {ReqId, Remaining}},
-        ?INFO("recv tcp reqid:~p, from:~p, cmd :~p",[{ReqId, Remaining}, From,Cmd]),
+        ?INFO("recv tcp reqid:~p, from:~p, cmd :~p",[{ReqId, Remaining/1000}, From,Cmd]),
         %TODO Terminator判断是否结束，然后回复，需要reqid是否一致，下一个包是否有head，目的多次信息收集，一次返回
 	    gen_server:reply(From, Reply),
 	    ets:delete(tl1_request_table, ReqId),
