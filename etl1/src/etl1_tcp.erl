@@ -44,20 +44,20 @@
 %%%-------------------------------------------------------------------
 start_link(NetIfOpts) ->
     ?INFO("start etl1_tcp....~p",[NetIfOpts]),
-	gen_server:start_link(?MODULE, [NetIfOpts], []).
+	gen_server2:start_link(?MODULE, [NetIfOpts], []).
 
 start_link(Name, NetIfOpts) ->
     ?INFO("start etl1_tcp....~p,~p",[Name, NetIfOpts]),
-	gen_server:start_link({local, Name}, ?MODULE, [NetIfOpts], []).
+	gen_server2:start_link({local, Name}, ?MODULE, [NetIfOpts], []).
 
 login_state(Pid, LoginState) ->
-    gen_server:cast(Pid, {login_state, LoginState}).
+    gen_server2:cast(Pid, {login_state, LoginState}).
 
 get_status(Pid) ->
-    gen_server:call(Pid, get_status, 6000).
+    gen_server2:call(Pid, get_status, 6000).
 
 send_tcp(Pid, Ptc)  ->
-    gen_server:cast(Pid, Ptc).
+    gen_server2:cast(Pid, Ptc).
 
 %%%-------------------------------------------------------------------
 %%% Callback functions from gen_server
