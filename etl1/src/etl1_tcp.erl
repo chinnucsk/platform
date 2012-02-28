@@ -125,7 +125,7 @@ login(Socket, Username, Password) ->
 %%          {stop, Reason, State}            (terminate/2 is called)
 %%--------------------------------------------------------------------
 handle_call(get_status, _From, #state{tl1_table = Tl1Table, conn_num = ConnNum, conn_state = connected} = State) ->
-    {reply, {ok, [{count, ets:info(Tl1Table, size) ++ ConnNum}, State]}, State};
+    {reply, {ok, [{count, ets:info(Tl1Table, size) + ConnNum}, State]}, State};
 
 handle_call(stop, _From, State) ->
     ?INFO("received stop request", []),
@@ -145,9 +145,9 @@ handle_cast({send_req, Pct, _Cmd}, #state{tl1_table = Tl1Table,conn_num = ConnNu
     ets:insert(Tl1Table, Pct),
     {noreply, State};
 
-handle_cast({send_req, Pct, Cmd}, #state{conn_num = ConnNum, conn_state = connected} = State) ->
-    handle_send_tcp(Pct, Cmd, State),
-    {noreply, State#state{conn_num = ConnNum -1}};
+handle_cast({send_req, Pct, Cmd}, #state{conn_state = connected} = State) ->
+    NewConnNum = handle_send_tcp(Pct, Cmd, State),
+    {noreply, State#state{conn_num = NewConnNum}};
 
 handle_cast({send_req, Pct, _Cmd}, #state{conn_state = ConnState, host = Host, port = Port} = State) ->
     etl1 ! {tl1_error, Pct, {conn_failed, ConnState, Host, Port}},
@@ -192,11 +192,11 @@ handle_info({tcp_closed, Socket}, #state{socket = Socket, host = Host, port = Po
     {noreply, State#state{socket = null, conn_state = disconnect}};
 
 
-handle_info(shakehand, #state{socket = Socket, conn_state = connected} = State) ->
+handle_info(shakehand, #state{conn_num = ConnNum, socket = Socket, conn_state = connected} = State) ->
     tcp_send(Socket, "SHAKEHAND:::shakehand::;"),
 %    ?INFO("send shakehand...~p",[State]),
     erlang:send_after(5 * 60 * 1000, self(), shakehand),
-    {noreply, State};
+    {noreply, State#state{conn_num = ConnNum + 1}};
 
 handle_info(shakehand, State) ->
     {noreply, State};
@@ -262,37 +262,45 @@ check_tl1_table(Reqid, ConnNum, #state{tl1_table = Tl1Table} = State) ->
      ConnNum.
 
 %% send
-handle_send_tcp(Pct, MsgData, #state{socket = Sock}) ->
+handle_send_tcp(Pct, MsgData, #state{conn_num = ConnNum, socket = Sock}) ->
    try etl1_mpd:generate_msg(Pct, MsgData) of
 	{ok, Msg} ->
-	    tcp_send(Pct, Sock, Msg);
+	    case tcp_send(Pct, Sock, Msg) of
+            succ -> ConnNum + 1;
+            fail -> ConnNum
+        end;
 	{discarded, Reason} ->
-        send_failed(Pct, Reason)
+        send_failed(Pct, Reason),
+        ConnNum
      catch
         Error:Exception ->
         ?ERROR("exception: ~p, ~n ~p", [{Error, Exception}, erlang:get_stacktrace()]),
-        send_failed(Pct, {'EXIT',Exception})
+        send_failed(Pct, {'EXIT',Exception}),
+        ConnNum
     end.
 
 tcp_send(Sock, Msg) ->
     case (catch gen_tcp:send(Sock, Msg)) of
 	ok ->
-	    ok;
+	    succ;
 	Error ->
-	    ?ERROR("failed sending message to ~n   ~p",[Error])
+	    ?ERROR("failed sending message to ~n   ~p",[Error]), 
+        fail
     end.
 
 tcp_send(Pct, Sock, Msg) ->
     case (catch gen_tcp:send(Sock, Msg)) of
 	ok ->
 	    ?INFO("send cmd  to :~p", [Msg]),
-	    ok;
+	    succ;
 	{error, Reason} ->
 	    ?ERROR("failed sending message to ~p",[Reason]),
-        send_failed(Pct, {tcp_send_error, Reason});
+        send_failed(Pct, {tcp_send_error, Reason}),
+        fail;
 	Error ->
 	    ?ERROR("failed sending message to ~n   ~p",[Error]),
-        send_failed(Pct, {tcp_send_exception, Error})
+        send_failed(Pct, {tcp_send_exception, Error}),
+        fail
     end.
 
 send_failed(Pct, ERROR) ->
