@@ -176,8 +176,7 @@ handle_info({tcp, Sock, Bytes}, #state{socket = Sock, rest = Rest, data = Data, 
             {OtherBytes, [LastBytes]} = lists:split(length(NowBytes)-1, NowBytes),
             NowData = handle_recv_wait(OtherBytes),
             handle_recv_msg(LastBytes, State#state{data = Data ++ NowData}),
-            NewConnNum = check_tl1_table(ConnNum, State),
-            {[], <<>>, ConnNum - 1};
+            {[], <<>>, check_tl1_table(ConnNum, State)};
         $> ->
             NowBytes = binary:split(list_to_binary([Rest, Bytes]), <<">">>, [global]),
             NowData = handle_recv_wait(NowBytes),
