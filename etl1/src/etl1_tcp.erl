@@ -29,7 +29,7 @@
 
 -define(MAX_CONN, 100).
 
--record(state, {host, port, username, password, socket, conn_num, max_conn, conn_state, login_state, rest = <<>>, data = []}).
+-record(state, {host, port, username, password, socket, tl1_table, conn_num, max_conn, conn_state, login_state, rest = <<>>, data = []}).
 
 -include("tl1.hrl").
 
@@ -80,7 +80,7 @@ init([Args]) ->
 
 do_init(Args) ->
     process_flag(trap_exit, true),
-    ets:new(tl1_table, [ordered_set, named_table, protected, {keypos, #request.id}]),
+    Tl1Table = ets:new(tl1_table, [ordered_set, {keypos, 2}]),
     %% -- Socket --
     Host = proplists:get_value(host, Args),
     Port = proplists:get_value(port, Args),
@@ -90,7 +90,7 @@ do_init(Args) ->
     {ok, Socket, ConnState} = connect(Host, Port, Username, Password),
     %%-- We are done ---
     {ok, #state{host = Host, port = Port, username = Username, password = Password,
-        socket = Socket, conn_num = 0, max_conn = MaxConn, conn_state = ConnState}}.
+        socket = Socket, tl1_table = Tl1Table, conn_num = 0, max_conn = MaxConn, conn_state = ConnState}}.
 
 connect(Host, Port, Username, Password) when is_binary(Host) ->
     connect(binary_to_list(Host), Port, Username, Password);
@@ -124,8 +124,8 @@ login(Socket, Username, Password) ->
 %%          {stop, Reason, Reply, State}   | (terminate/2 is called)
 %%          {stop, Reason, State}            (terminate/2 is called)
 %%--------------------------------------------------------------------
-handle_call(get_status, _From, #state{conn_num = ConnNum, conn_state = connected} = State) ->
-    {reply, {ok, [{count, ets:info(tl1_table, size) ++ ConnNum}, State]}, State};
+handle_call(get_status, _From, #state{tl1_table = Tl1Table, conn_num = ConnNum, conn_state = connected} = State) ->
+    {reply, {ok, [{count, ets:info(Tl1Table, size) ++ ConnNum}, State]}, State};
 
 handle_call(stop, _From, State) ->
     ?INFO("received stop request", []),
@@ -141,8 +141,8 @@ handle_call(Req, _From, State) ->
 %%          {noreply, State, Timeout} |
 %%          {stop, Reason, State}            (terminate/2 is called)
 %%--------------------------------------------------------------------
-handle_cast({send_req, Pct, _Cmd}, #state{conn_num = ConnNum, conn_state = connected} = State) when ConnNum > ?MAX_CONN ->
-    ets:insert(tl1_table, Pct),
+handle_cast({send_req, Pct, _Cmd}, #state{tl1_table = Tl1Table,conn_num = ConnNum, conn_state = connected} = State) when ConnNum > ?MAX_CONN ->
+    ets:insert(Tl1Table, Pct),
     {noreply, State};
 
 handle_cast({send_req, Pct, Cmd}, #state{conn_num = ConnNum, conn_state = connected} = State) ->
@@ -246,16 +246,16 @@ code_change(_Vsn, State, _Extra) ->
 retry_connect() ->
     erlang:send_after(30000, self(), {timeout, retry_connect}).
 
-check_tl1_table(ConnNum, State) ->
-    check_tl1_table(ets:first(tl1_table), ConnNum, State).
+check_tl1_table(ConnNum, #state{tl1_table = Tl1Table} = State) ->
+    check_tl1_table(ets:first(Tl1Table), ConnNum, State).
 
 check_tl1_table('$end_of_table', ConnNum, _State) ->
     ConnNum - 1;
-check_tl1_table(Reqid, ConnNum, State) ->
-    case ets:lookup(tl1_table, Reqid) of
+check_tl1_table(Reqid, ConnNum, #state{tl1_table = Tl1Table} = State) ->
+    case ets:lookup(Tl1Table, Reqid) of
         [Pct] ->
             handle_send_tcp(Pct, Pct#request.data, State),
-            ets:delete(tl1_table, Reqid);
+            ets:delete(Tl1Table, Reqid);
         [] ->
             ok
      end,
