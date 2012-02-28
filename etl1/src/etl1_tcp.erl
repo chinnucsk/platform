@@ -2,7 +2,7 @@
 
 -author("hejin-2011-03-24").
 
--behaviour(gen_server).
+-behaviour(gen_server2).
 
 %% Network Interface callback functions
 -export([start_link/1, start_link/2,
@@ -10,7 +10,13 @@
         send_tcp/2]).
 
 %% gen_server callbacks
--export([init/1, handle_call/3, handle_cast/2, handle_info/2, code_change/3, terminate/2]).
+-export([init/1,
+        handle_call/3,
+        handle_cast/2,
+        handle_info/2,
+        prioritise_info/2,
+        code_change/3,
+        terminate/2]).
 
 -include("elog.hrl").
 
@@ -21,9 +27,13 @@
 
 -define(TIMEOUT, 12000).
 
--record(state, {host, port, username, password, socket, conn_state, login_state, rest = <<>>, data = []}).
+-define(MAX_CONN, 100).
+
+-record(state, {host, port, username, password, socket, conn_num, max_conn, conn_state, login_state, rest = <<>>, data = []}).
 
 -include("tl1.hrl").
+
+-record(request,  {id, type, data, ref, timeout, time, from}).
 
 -import(dataset, [get_value/2, get_value/3]).
 
@@ -61,6 +71,7 @@ send_tcp(Pid, Ptc)  ->
 %%          {stop, Reason}
 %%--------------------------------------------------------------------
 init([Args]) ->
+    ets:new(tl1_table, [orederset, named_table, {keypos, #request.id}]),
     case (catch do_init(Args)) of
 	{error, Reason} ->
 	    {stop, Reason};
@@ -75,10 +86,11 @@ do_init(Args) ->
     Port = proplists:get_value(port, Args),
     Username = proplists:get_value(username, Args, ?USERNAME),
     Password = proplists:get_value(password, Args, ?PASSWORD),
+    MaxConn = proplists:get_value(max_conn, Args, ?MAX_CONN),
     {ok, Socket, ConnState} = connect(Host, Port, Username, Password),
     %%-- We are done ---
     {ok, #state{host = Host, port = Port, username = Username, password = Password,
-        socket = Socket, conn_state = ConnState}}.
+        socket = Socket, conn_num = 0, max_conn = MaxConn, conn_state = ConnState}}.
 
 connect(Host, Port, Username, Password) when is_binary(Host) ->
     connect(binary_to_list(Host), Port, Username, Password);
@@ -112,8 +124,8 @@ login(Socket, Username, Password) ->
 %%          {stop, Reason, Reply, State}   | (terminate/2 is called)
 %%          {stop, Reason, State}            (terminate/2 is called)
 %%--------------------------------------------------------------------
-handle_call(get_status, _From, State) ->
-    {reply, {ok, State}, State};
+handle_call(get_status, _From, #state{conn_num = ConnNum, conn_state = connected} = State) ->
+    {reply, {ok, [{count, ets:info(tl1_table, size) ++ ConnNum}, State]}, State};
 
 handle_call(stop, _From, State) ->
     ?INFO("received stop request", []),
@@ -129,9 +141,13 @@ handle_call(Req, _From, State) ->
 %%          {noreply, State, Timeout} |
 %%          {stop, Reason, State}            (terminate/2 is called)
 %%--------------------------------------------------------------------
-handle_cast({send_req, Pct, Cmd}, #state{conn_state = connected} = State) ->
-    handle_send_tcp(Pct, Cmd, State),
+handle_cast({send_req, Pct, _Cmd}, #state{conn_num = ConnNum, conn_state = connected} = State) when ConnNum > ?MAX_CONN ->
+    ets:insert(tl1_table, Pct),
     {noreply, State};
+
+handle_cast({send_req, Pct, Cmd}, #state{conn_num = ConnNum, conn_state = connected} = State) ->
+    handle_send_tcp(Pct, Cmd, State),
+    {noreply, State#state{conn_num = ConnNum -1}};
 
 handle_cast({send_req, Pct, _Cmd}, #state{conn_state = ConnState, host = Host, port = Port} = State) ->
     etl1 ! {tl1_error, Pct, {conn_failed, ConnState, Host, Port}},
@@ -152,23 +168,24 @@ handle_cast(Msg, State) ->
 %%          {noreply, State, Timeout} |
 %%          {stop, Reason, State}            (terminate/2 is called)
 %%--------------------------------------------------------------------
-handle_info({tcp, Sock, Bytes}, #state{socket = Sock, rest = Rest, data = Data} = State) ->
+handle_info({tcp, Sock, Bytes}, #state{socket = Sock, rest = Rest, data = Data, conn_num = ConnNum} = State) ->
     ?INFO("received tcp ~p ", [Bytes]),
-    {NewData, NewRest} = case binary:last(Bytes) of
+    {NewData, NewRest, NewConnNum} = case binary:last(Bytes) of
         $; ->
             NowBytes = binary:split(list_to_binary([Rest, Bytes]), <<">">>, [global]),
             {OtherBytes, [LastBytes]} = lists:split(length(NowBytes)-1, NowBytes),
             NowData = handle_recv_wait(OtherBytes),
             handle_recv_msg(LastBytes, State#state{data = Data ++ NowData}),
-            {[], <<>>};
+            NewConnNum = check_tl1_table(ConnNum, State),
+            {[], <<>>, ConnNum - 1};
         $> ->
             NowBytes = binary:split(list_to_binary([Rest, Bytes]), <<">">>, [global]),
             NowData = handle_recv_wait(NowBytes),
-            {Data ++ NowData, <<>>};
+            {Data ++ NowData, <<>>, ConnNum};
         _ ->
-            {Data, list_to_binary([Rest, Bytes])}
+            {Data, list_to_binary([Rest, Bytes]), ConnNum}
        end,
-    {noreply, State#state{rest = NewRest, data = NewData}};
+    {noreply, State#state{rest = NewRest, data = NewData, conn_num = NewConnNum}};
 
 handle_info({tcp_closed, Socket}, #state{socket = Socket, host = Host, port = Port} = State) ->
     ?ERROR("tcp close: ~p,~p,~p", [Host, Port, Socket]),
@@ -183,16 +200,26 @@ handle_info(shakehand, #state{socket = Socket, conn_state = connected} = State) 
     {noreply, State};
 
 handle_info(shakehand, State) ->
-%    ?INFO("ignore shakehand...~p",[State]),
     {noreply, State};
 
 handle_info({timeout, retry_connect},  #state{host = Host, port = Port, username = Username, password = Password} = State) ->
     {ok, Socket, ConnState} = connect(Host, Port, Username, Password),
-    {noreply, State#state{socket = Socket, conn_state = ConnState}};
+    {noreply, State#state{socket = Socket, conn_num = 0, conn_state = ConnState}};
 
 handle_info(Info, State) ->
     ?WARNING("unexpected info: ~n~p", [Info]),
     {noreply, State}.
+
+prioritise_info(get_status, _State) ->
+    9;
+prioritise_info(tcp_closed, _State) ->
+    7;
+prioritise_info({timeout, retry_connect}, _State) ->
+    7;
+prioritise_info(shakehand, _State) ->
+    5;
+prioritise_info(_, _State) ->
+    0.
 
 %%--------------------------------------------------------------------
 %% Func: terminate/2
@@ -202,6 +229,7 @@ handle_info(Info, State) ->
 terminate(_Reason, _State) ->
     ok.
 
+
 %%----------------------------------------------------------------------
 %% Func: code_change/3
 %% Purpose: Convert process state when code is changed
@@ -210,16 +238,33 @@ terminate(_Reason, _State) ->
 code_change(_Vsn, State, _Extra) ->
     {ok, State}.
 
+
+
+
 %%%-------------------------------------------------------------------
 %%% Internal functions
 %%%-------------------------------------------------------------------
 retry_connect() ->
     erlang:send_after(30000, self(), {timeout, retry_connect}).
 
+check_tl1_table(ConnNum, State) ->
+    check_tl1_table(ets:first(tl1_table), ConnNum, State).
+
+check_tl1_table('$end_of_table', ConnNum, _State) ->
+    ConnNum - 1;
+check_tl1_table(Reqid, ConnNum, State) ->
+    case ets:lookup(tl1_table, Reqid) of
+        [Pct] ->
+            handle_send_tcp(Pct, Pct#request.data, State),
+            ets:delete(tl1_table, Reqid);
+        [] ->
+            ok
+     end,
+     ConnNum.
 
 %% send
 handle_send_tcp(Pct, MsgData, #state{socket = Sock}) ->
-    try etl1_mpd:generate_msg(Pct, MsgData) of
+   try etl1_mpd:generate_msg(Pct, MsgData) of
 	{ok, Msg} ->
 	    tcp_send(Pct, Sock, Msg);
 	{discarded, Reason} ->
