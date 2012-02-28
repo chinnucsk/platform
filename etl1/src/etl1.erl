@@ -243,8 +243,8 @@ handle_sync_input(Pid, Cmd, Timeout, From, #state{req_id = ReqId} = State) ->
             ReqId + 1
         end,
     ?INFO("input reqid:~p, cmd:~p, state:~p",[NextReqId, Cmd, State]),
-    Session = #pct{type = 'input',
-               request_id = NextReqId,
+    Session = #pct{request_id = NextReqId,
+               type = 'input',
                complete_code = 'REQ',
                data = Cmd},
     etl1_tcp:send_tcp(Pid, {send_req, Session, Cmd}),
@@ -273,7 +273,7 @@ handle_tl1_error(#pct{request_id = ReqId} = _Pct, Reason) ->
     end.
 
 %% receive
-handle_recv_tcp(#pct{type = 'output', request_id = ReqId, complete_code = CompCode, data = Data} = _Pct,  _State) ->
+handle_recv_tcp(#pct{request_id = ReqId, type = 'output', complete_code = CompCode, data = Data} = _Pct,  _State) ->
 %    ?INFO("recv tcp reqid:~p, code:~p, data:~p",[ReqId, CompCode, Data]),
     case ets:lookup(tl1_request_table, to_integer(ReqId)) of
 	[#request{ref = Ref, data = Cmd, timeout = Timeout, from = From}] ->

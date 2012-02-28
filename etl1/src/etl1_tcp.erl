@@ -33,8 +33,6 @@
 
 -include("tl1.hrl").
 
--record(request,  {id, type, data, ref, timeout, time, from}).
-
 -import(dataset, [get_value/2, get_value/3]).
 
 -import(extbif, [to_list/1]).
@@ -80,7 +78,7 @@ init([Args]) ->
 
 do_init(Args) ->
     process_flag(trap_exit, true),
-    Tl1Table = ets:new(tl1_table, [ordered_set, {keypos, 2}]),
+    Tl1Table = ets:new(tl1_table, [ordered_set, {keypos, #pct.request_id}]),
     %% -- Socket --
     Host = proplists:get_value(host, Args),
     Port = proplists:get_value(port, Args),
@@ -254,7 +252,7 @@ check_tl1_table('$end_of_table', ConnNum, _State) ->
 check_tl1_table(Reqid, ConnNum, #state{tl1_table = Tl1Table} = State) ->
     case ets:lookup(Tl1Table, Reqid) of
         [Pct] ->
-            handle_send_tcp(Pct, Pct#request.data, State),
+            handle_send_tcp(Pct, Pct#pct.data, State),
             ets:delete(Tl1Table, Reqid);
         [] ->
             ok
@@ -346,9 +344,9 @@ handle_recv_msg(Bytes, #state{data = Data, socket = Socket, username = Username,
     {ok, #pct{type = 'output', complete_code = "DENY", en = "AAFD"}} ->
         ?WARNING("begin to relogin...~p", [State]),
         login(Socket, Username, Password);
-    {ok, #pct{type = 'output',request_id = "shakehand", complete_code =_CompletionCode}} ->
+    {ok, #pct{request_id = "shakehand", type = 'output',complete_code =_CompletionCode}} ->
         ok;
-    {ok, #pct{type = 'output',request_id = "login", complete_code =CompletionCode}} ->
+    {ok, #pct{request_id = "login", type = 'output',complete_code =CompletionCode}} ->
         LoginState = case CompletionCode of
             "COMPLD" -> succ;
             "DENY" -> fail
