@@ -43,7 +43,7 @@ get_tl1() ->
 
 
 set_tl1(Tl1Info) ->
-    ?INFO("set tl1 info....~p",[Tl1Info]),
+    ?WARNING("set tl1 info....~p",[Tl1Info]),
     gen_server:call(?MODULE, {set_tl1, Tl1Info}, ?CALL_TIMEOUT).
 
 %%Cmd = LST-ONUSTATE::OLTID=${oltid},PORTID=${portid}:CTAG::;
