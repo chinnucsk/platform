@@ -71,7 +71,6 @@ send_tcp(Pid, Ptc)  ->
 %%          {stop, Reason}
 %%--------------------------------------------------------------------
 init([Args]) ->
-    ets:new(tl1_table, [ordered_set, named_table, {keypos, #request.id}]),
     case (catch do_init(Args)) of
 	{error, Reason} ->
 	    {stop, Reason};
@@ -81,6 +80,7 @@ init([Args]) ->
 
 do_init(Args) ->
     process_flag(trap_exit, true),
+    ets:new(tl1_table, [ordered_set, named_table, protected, {keypos, #request.id}]),
     %% -- Socket --
     Host = proplists:get_value(host, Args),
     Port = proplists:get_value(port, Args),
