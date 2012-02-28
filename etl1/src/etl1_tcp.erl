@@ -71,7 +71,7 @@ send_tcp(Pid, Ptc)  ->
 %%          {stop, Reason}
 %%--------------------------------------------------------------------
 init([Args]) ->
-    ets:new(tl1_table, [orederset, named_table, {keypos, #request.id}]),
+    ets:new(tl1_table, [ordered_set, named_table, {keypos, #request.id}]),
     case (catch do_init(Args)) of
 	{error, Reason} ->
 	    {stop, Reason};
