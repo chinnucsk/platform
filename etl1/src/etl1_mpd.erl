@@ -39,8 +39,8 @@ process_msg(Lines) ->
      end,
     Terminator = lists:last(Lines),
     ?INFO("reqid:~p,comp_code: ~p, terminator: ~p, data:~p",[ReqId, CompletionCode, Terminator, RespondData]),
-    Pct = #pct{type = 'output',
-               request_id = ReqId,
+    Pct = #pct{request_id = ReqId,
+               type = 'output',
                complete_code = CompletionCode,
                en = En,
                data =  RespondData

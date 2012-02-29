@@ -299,7 +299,7 @@ handle_recv_tcp(#pct{request_id = ReqId, type = 'output', complete_code = CompCo
         end
 	end;
 handle_recv_tcp(CrapPdu, _State) ->
-    ?ERROR("received crap (snmp) Pdu from ~w:~w =>~p", [CrapPdu]),
+    ?ERROR("received crap  Pdu from =>~p", [CrapPdu]),
     ok.
 
 %% sencond fun
