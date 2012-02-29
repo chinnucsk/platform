@@ -10,11 +10,9 @@
 -module(extbif).
 
 -export([appvsn/0,
-        datetime/0,
-        datetime/1,
+        datetime/0, datetime/1,
         timestamp/0, 
-        strftime/0,
-        strftime/1,
+        strftime/0, strftime/1, strftime/3,
         microsecs/0,
         millsecs/0,
         to_atom/1,
@@ -49,12 +47,15 @@ datetime() ->
     calendar:local_time().
 
 strftime() ->
-    strftime({date(), time()}).
+    strftime({date(), time()}, "-", ";").
 
 strftime(DateTime) ->
+    strftime(DateTime, "-", ";").
+
+strftime(DateTime, FSplit, SSplit) ->
     {{Y,M,D}, {H,MM,S}} = DateTime,
-    Date = string:join([zeropad(I) || I <- [Y,M,D]], "-"),
-    Time = string:join([zeropad(I) || I <- [H, MM, S]], ":"),
+    Date = string:join([zeropad(I) || I <- [Y,M,D]], FSplit),
+    Time = string:join([zeropad(I) || I <- [H, MM, S]], SSplit),
     lists:concat([Date, " ", Time]).
     
 datetime(Seconds) when is_integer(Seconds) ->
