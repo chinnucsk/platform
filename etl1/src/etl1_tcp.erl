@@ -41,11 +41,11 @@
 %%% API
 %%%-------------------------------------------------------------------
 start_link(NetIfOpts) ->
-    ?INFO("start etl1_tcp....~p",[NetIfOpts]),
+    ?WARNING("start etl1_tcp....~p",[NetIfOpts]),
 	gen_server2:start_link(?MODULE, [NetIfOpts], []).
 
 start_link(Name, NetIfOpts) ->
-    ?INFO("start etl1_tcp....~p,~p",[Name, NetIfOpts]),
+    ?WARNING("start etl1_tcp....~p,~p",[Name, NetIfOpts]),
 	gen_server2:start_link({local, Name}, ?MODULE, [NetIfOpts], []).
 
 login_state(Pid, LoginState) ->

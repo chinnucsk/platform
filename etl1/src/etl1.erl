@@ -7,7 +7,7 @@
 %% Network Interface callback functions
 -export([start_link/1,
         set_tl1/1,
-        get_tl1/0,
+        get_tl1/0, get_tl1_req/0,
         input/2, input/3,
         input_group/2, input_group/3
      ]).
@@ -40,6 +40,10 @@ start_link(Tl1Options) ->
 
 get_tl1() ->
     gen_server:call(?MODULE, get_tl1, ?CALL_TIMEOUT).
+
+
+get_tl1_req() ->
+    [{tl1_timeout, ets:info(tl1_request_timeout, size)}, {tl1_table, ets:info(tl1_request_table, size)}].
 
 
 set_tl1(Tl1Info) ->
@@ -121,13 +125,21 @@ do_connect(Tl1Info) ->
     ?INFO("get tl1 info:~p", [Tl1Info]),
     Type = proplists:get_value(manu, Tl1Info),
     CityId = proplists:get_value(cityid, Tl1Info, <<"">>),
-    case etl1_tcp:start_link(Tl1Info) of
+    case  do_connect2(Tl1Info) of
         {ok, Pid} ->
             {{to_list(Type), to_list(CityId)}, Pid};
         {error, Error} ->
             ?ERROR("get tcp error: ~p, ~p", [Error, Tl1Info]),
             []
      end.
+
+do_connect2(Tl1Info) ->
+    case proplists:get_value(id, Tl1Info, false) of
+        false -> 
+            etl1_tcp:start_link(Tl1Info);
+        Id ->
+            etl1_tcp:start_link("etl1_tcp_" ++ to_list(Id), Tl1Info)
+    end.
 
 %%--------------------------------------------------------------------
 %% Func: handle_call/3
