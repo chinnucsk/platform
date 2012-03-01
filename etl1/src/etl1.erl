@@ -138,7 +138,7 @@ do_connect2(Tl1Info) ->
         false -> 
             etl1_tcp:start_link(Tl1Info);
         Id ->
-            etl1_tcp:start_link("etl1_tcp_" ++ to_list(Id), Tl1Info)
+            etl1_tcp:start_link(list_to_atom("etl1_tcp_" ++ to_list(Id)), Tl1Info)
     end.
 
 %%--------------------------------------------------------------------
