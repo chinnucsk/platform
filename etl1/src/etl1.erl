@@ -5,7 +5,8 @@
 -behaviour(gen_server).
 
 %% Network Interface callback functions
--export([start_link/1,
+-export([start_link/1, start_link/2,
+        register_callback/1,
         set_tl1/1,
         get_tl1/0, get_tl1_req/0,
         input/2, input/3,
@@ -29,7 +30,7 @@
 
 -record(request,  {id, type, data, ref, timeout, time, from}).
 
--record(state, {tl1_tcp, req_id=0}).
+-record(state, {tl1_tcp, req_id=0, callback}).
 
 %%%-------------------------------------------------------------------
 %%% API
@@ -37,6 +38,13 @@
 start_link(Tl1Options) ->
     ?INFO("start etl1....~p",[Tl1Options]),
 	gen_server:start_link({local, ?MODULE},?MODULE, [Tl1Options], []).
+
+start_link(Name, Tl1Options) ->
+    ?INFO("start etl1....~p",[Tl1Options]),
+	gen_server:start_link({local, Name},?MODULE, [Tl1Options], []).
+
+register_callback(Pid, Callback) ->
+    gen_server:cast(Pid, {callback, Callback}).
 
 get_tl1() ->
     gen_server:call(?MODULE, get_tl1, ?CALL_TIMEOUT).
@@ -85,7 +93,9 @@ input_group(Type, Cmd, Timeout) ->
         Other ->
             Other
     end.
-    
+
+input_cmd(Pid, Type, Cmd) ->
+    gen_server:get_cast(Pid, {asyn_input, Type, Cmd}).
 
 %%%-------------------------------------------------------------------
 %%% Callback functions from gen_server
@@ -150,6 +160,9 @@ do_connect2(Tl1Info) ->
 %%          {stop, Reason, Reply, State}   | (terminate/2 is called)
 %%          {stop, Reason, State}            (terminate/2 is called)
 %%--------------------------------------------------------------------
+handle_call({callback, _From, Callback}, #state{callback = Pids} = State) ->
+    {reply, ok, State#state{callback = [Callback|Pids]}};
+
 handle_call(get_tl1, _From, #state{tl1_tcp = Pids} = State) ->
     Result = lists:map(fun({_Type, Pid}) ->
         {ok, TcpState} = etl1_tcp:get_status(Pid),
@@ -188,6 +201,16 @@ handle_call(Req, _From, State) ->
 %%          {noreply, State, Timeout} |
 %%          {stop, Reason, State}            (terminate/2 is called)
 %%--------------------------------------------------------------------
+hande_cast({asyn_input, Type, Cmd}, #state{tl1_tcp = Pids} = State) ->
+    ?INFO("handle_cast, Cmd,~p", [Cmd]),
+    case get_tl1_tcp(Type, Pids) of
+        [] ->
+            ?ERROR("error:type:~p, state:~p",[Type,State]);
+        [Pid] ->
+            handle_asyn_input(Pid, Cmd, State)
+    end,
+    {noreply, State};
+
 handle_cast(Msg, State) ->
     ?WARNING("unexpected message: ~n~p", [Msg]),
     {noreply, State}.
@@ -201,12 +224,12 @@ handle_cast(Msg, State) ->
 handle_info({sync_timeout, ReqId, From}, State) ->
     ?WARNING("received sync_timeout [~w] message", [ReqId]),
     case ets:lookup(tl1_request_table, ReqId) of
-	[#request{from = From, data = Data} = Req] ->
-	    gen_server:reply(From, {error, {tl1_timeout, [ReqId, Data]}}),
-	    ets:insert(tl1_request_timeout, Req),
-	    ets:delete(tl1_request_table, ReqId);
-	_ ->
-        ?ERROR("cannot lookup reqid:~p", [ReqId])
+        [#request{from = From, data = Data} = Req] ->
+            gen_server:reply(From, {error, {tl1_timeout, [ReqId, Data]}}),
+            ets:insert(tl1_request_timeout, Req),
+            ets:delete(tl1_request_table, ReqId);
+        _ ->
+            ?ERROR("cannot lookup reqid:~p", [ReqId])
     end,
     {noreply, State};
 
@@ -214,8 +237,12 @@ handle_info({tl1_error, Pct, Reason}, State) ->
     handle_tl1_error(Pct, Reason),
     {noreply, State};
 
-handle_info({tl1_tcp, Pct}, State) ->
+handle_info({tl1_tcp, Pct}, #state{callback = undefined} = State) ->
     handle_recv_tcp(Pct, State),
+    {noreply, State};
+
+handle_info({tl1_tcp, Pct}, State) ->
+    handle_asyn_recv_tcp(Pct, State),
     {noreply, State};
 
 handle_info({'EXIT', Pid, Reason}, #state{tl1_tcp = Pids} = State) ->
@@ -272,6 +299,20 @@ handle_sync_input(Pid, Cmd, Timeout, From, #state{req_id = ReqId} = State) ->
     ets:insert(tl1_request_table, Req),
     {ok, State#state{req_id = NextReqId}}.
 
+handle_asyn_input(Pid, Cmd, #state{req_id = ReqId} = State) ->
+    NextReqId = 
+        if ReqId == 1000 * 1000 ->
+           0;
+         true ->
+            ReqId + 1
+        end,
+    ?INFO("input reqid:~p, cmd:~p, state:~p",[NextReqId, Cmd, State]),
+    Session = #pct{request_id = NextReqId,
+               type = 'asyn_input',
+               complete_code = 'REQ',
+               data = Cmd},
+    etl1_tcp:send_tcp(Pid, {send_req, Session, Cmd}).
+
 %% send error
 handle_tl1_error(#pct{request_id = ReqId} = _Pct, Reason) ->
     case ets:lookup(tl1_request_table, ReqId) of
@@ -284,7 +325,21 @@ handle_tl1_error(#pct{request_id = ReqId} = _Pct, Reason) ->
 		?ERROR("unexpected tl1, reqid:~p, error: ~p",[ReqId, Reason])
     end.
 
+
 %% receive
+handle_asyn_recv_tcp(#pct{request_id = ReqId, type = 'output', complete_code = CompCode, data = Data} = _Pct,
+    #state{callback = Callback} = _State) ->
+    ?INFO("recv tcp reqid:~p, cmd :~p",[ReqId]),
+    lists:map(fun(Pid) ->
+        OutputData = {CompCode, Data},
+        Reply = {ok, OutputData, {ReqId}},
+        Pid ! Reply
+    end, Callback);
+handle_asyn_recv_tcp(Pct, _State) ->
+    ?ERROR("received asyn  Pct from =>~p", [Pct]),
+    ok.
+
+
 handle_recv_tcp(#pct{request_id = ReqId, type = 'output', complete_code = CompCode, data = Data} = _Pct,  _State) ->
 %    ?INFO("recv tcp reqid:~p, code:~p, data:~p",[ReqId, CompCode, Data]),
     case ets:lookup(tl1_request_table, to_integer(ReqId)) of
@@ -302,7 +357,7 @@ handle_recv_tcp(#pct{request_id = ReqId, type = 'output', complete_code = CompCo
 	    ok;
 	_ ->
         case ets:lookup(tl1_request_timeout, to_integer(ReqId)) of
-            [#request{data = Cmd, time = Time, from = From}] ->
+            [#request{data = Cmd, time = Time}] ->
                 Now = extbif:timestamp(),
                 ?ERROR("cannot find reqid:~p, time:~p, cmd:~p", [ReqId, Now - Time, Cmd]),
                 ets:delete(tl1_request_timeout, ReqId);
@@ -310,8 +365,8 @@ handle_recv_tcp(#pct{request_id = ReqId, type = 'output', complete_code = CompCo
                 ?ERROR("cannot find reqid:~p", [ReqId])
         end
 	end;
-handle_recv_tcp(CrapPdu, _State) ->
-    ?ERROR("received crap  Pdu from =>~p", [CrapPdu]),
+handle_recv_tcp(Pct, _State) ->
+    ?ERROR("received crap  Pct from =>~p", [Pct]),
     ok.
 
 %% sencond fun

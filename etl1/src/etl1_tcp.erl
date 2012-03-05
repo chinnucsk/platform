@@ -29,7 +29,7 @@
 
 -define(MAX_CONN, 100).
 
--record(state, {host, port, username, password, socket, tl1_table, conn_num, max_conn, conn_state, login_state, rest = <<>>, data = []}).
+-record(state, {server, host, port, username, password, socket, tl1_table, conn_num, max_conn, conn_state, login_state, rest, data}).
 
 -include("tl1.hrl").
 
@@ -68,15 +68,15 @@ send_tcp(Pid, Ptc)  ->
 %%          ignore               |
 %%          {stop, Reason}
 %%--------------------------------------------------------------------
-init([Args]) ->
-    case (catch do_init(Args)) of
+init([Server, Args]) ->
+    case (catch do_init(Server, Args)) of
 	{error, Reason} ->
 	    {stop, Reason};
 	{ok, State} ->
 	    {ok, State}
     end.
 
-do_init(Args) ->
+do_init(Server, Args) ->
     process_flag(trap_exit, true),
     Tl1Table = ets:new(tl1_table, [ordered_set, {keypos, #pct.request_id}]),
     %% -- Socket --
@@ -87,8 +87,8 @@ do_init(Args) ->
     MaxConn = proplists:get_value(max_conn, Args, ?MAX_CONN),
     {ok, Socket, ConnState} = connect(Host, Port, Username, Password),
     %%-- We are done ---
-    {ok, #state{host = Host, port = Port, username = Username, password = Password,
-        socket = Socket, tl1_table = Tl1Table, conn_num = 0, max_conn = MaxConn, conn_state = ConnState}}.
+    {ok, #state{server = Server, host = Host, port = Port, username = Username, password = Password,
+        socket = Socket, tl1_table = Tl1Table, conn_num = 0, max_conn = MaxConn, conn_state = ConnState, rest = <<>>, data = []}}.
 
 connect(Host, Port, Username, Password) when is_binary(Host) ->
     connect(binary_to_list(Host), Port, Username, Password);
@@ -147,8 +147,8 @@ handle_cast({send_req, Pct, Cmd}, #state{conn_state = connected} = State) ->
     NewConnNum = handle_send_tcp(Pct, Cmd, State),
     {noreply, State#state{conn_num = NewConnNum}};
 
-handle_cast({send_req, Pct, _Cmd}, #state{conn_state = ConnState, host = Host, port = Port} = State) ->
-    etl1 ! {tl1_error, Pct, {conn_failed, ConnState, Host, Port}},
+handle_cast({send_req, Pct, _Cmd}, #state{server = Server, conn_state = ConnState, host = Host, port = Port} = State) ->
+    Server ! {tl1_error, Pct, {conn_failed, ConnState, Host, Port}},
     {noreply, State};
 
 handle_cast({login_state, LoginState}, State) ->
@@ -260,20 +260,20 @@ check_tl1_table(Reqid, ConnNum, #state{tl1_table = Tl1Table} = State) ->
      ConnNum.
 
 %% send
-handle_send_tcp(Pct, MsgData, #state{conn_num = ConnNum, socket = Sock}) ->
+handle_send_tcp(Pct, MsgData, #state{server = Server, conn_num = ConnNum, socket = Sock}) ->
    try etl1_mpd:generate_msg(Pct, MsgData) of
 	{ok, Msg} ->
-	    case tcp_send(Pct, Sock, Msg) of
+	    case tcp_send(Server, Pct, Sock, Msg) of
             succ -> ConnNum + 1;
             fail -> ConnNum
         end;
 	{discarded, Reason} ->
-        send_failed(Pct, Reason),
+        send_failed(Server, Pct, Reason),
         ConnNum
      catch
         Error:Exception ->
         ?ERROR("exception: ~p, ~n ~p", [{Error, Exception}, erlang:get_stacktrace()]),
-        send_failed(Pct, {'EXIT',Exception}),
+        send_failed(Server, Pct, {'EXIT',Exception}),
         ConnNum
     end.
 
@@ -286,23 +286,23 @@ tcp_send(Sock, Msg) ->
         fail
     end.
 
-tcp_send(Pct, Sock, Msg) ->
+tcp_send(Server, Pct, Sock, Msg) ->
     case (catch gen_tcp:send(Sock, Msg)) of
 	ok ->
 	    ?INFO("send cmd  to :~p", [Msg]),
 	    succ;
 	{error, Reason} ->
 	    ?ERROR("failed sending message to ~p",[Reason]),
-        send_failed(Pct, {tcp_send_error, Reason}),
+        send_failed(Server, Pct, {tcp_send_error, Reason}),
         fail;
 	Error ->
 	    ?ERROR("failed sending message to ~n   ~p",[Error]),
-        send_failed(Pct, {tcp_send_exception, Error}),
+        send_failed(Server, Pct, {tcp_send_exception, Error}),
         fail
     end.
 
-send_failed(Pct, ERROR) ->
-    etl1 ! {tl1_error, Pct, ERROR}.
+send_failed(Server, Pct, ERROR) ->
+    Server ! {tl1_error, Pct, ERROR}.
 
 %% receive
 handle_recv_wait(Bytes) ->
@@ -331,7 +331,7 @@ handle_recv_wait(Bytes, Data) when is_binary(Bytes)->
 
 handle_recv_msg(<<>>, _State)  ->
     ok;
-handle_recv_msg(Bytes, #state{data = Data, socket = Socket, username = Username, password = Password} = State) ->
+handle_recv_msg(Bytes, #state{server = Server, data = Data, socket = Socket, username = Username, password = Password} = State) ->
     case (catch etl1_mpd:process_msg(Bytes)) of
 	%% BMK BMK BMK
 	%% Do we really need message size here??
@@ -359,7 +359,7 @@ handle_recv_msg(Bytes, #state{data = Data, socket = Socket, username = Username,
             {error, _Reason} ->
                 {error, _Reason}
         end,
-        etl1 ! {tl1_tcp, Pct#pct{data = NewData}};
+        Server ! {tl1_tcp, Pct#pct{data = NewData}};
 
 	Error ->
 	    ?ERROR("processing of received message failed: ~n ~p", [Error]),

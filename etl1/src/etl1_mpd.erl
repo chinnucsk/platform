@@ -80,7 +80,7 @@ get_response_data(Block) ->
     {PackageRecordsNo, Block2} = get_response_data("block_records=", Block1),
     {Title, Block3} = get_response_data("list |List |LST ", Block2),
     {_SpliteLine, Block4} = get_response_data("---", Block3),
-%    ?INFO("get response:~p", [{TotalPackageNo, CurrPackageNo, PackageRecordsNo, Title}]),
+    ?INFO("get response:~p", [{TotalPackageNo, CurrPackageNo, PackageRecordsNo, Title}]),
     case get_response_data(fields, Block4) of
 			{fields, []} ->
                 no_data;
