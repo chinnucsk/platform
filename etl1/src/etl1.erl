@@ -6,11 +6,12 @@
 
 %% Network Interface callback functions
 -export([start_link/1, start_link/2,
-        register_callback/1,
+        register_callback/2,
         set_tl1/1,
         get_tl1/0, get_tl1_req/0,
         input/2, input/3,
-        input_group/2, input_group/3
+        input_group/2, input_group/3,
+        input_cmd/3
      ]).
 
 %% gen_server callbacks
