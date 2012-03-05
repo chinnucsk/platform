@@ -147,9 +147,9 @@ do_connect(Tl1Info) ->
 do_connect2(Tl1Info) ->
     case proplists:get_value(id, Tl1Info, false) of
         false -> 
-            etl1_tcp:start_link(Tl1Info);
+            etl1_tcp:start_link(self(), Tl1Info);
         Id ->
-            etl1_tcp:start_link(list_to_atom("etl1_tcp_" ++ to_list(Id)), Tl1Info)
+            etl1_tcp:start_link(self(), list_to_atom("etl1_tcp_" ++ to_list(Id)), Tl1Info)
     end.
 
 %%--------------------------------------------------------------------
@@ -206,7 +206,7 @@ handle_call(Req, _From, State) ->
 %%          {noreply, State, Timeout} |
 %%          {stop, Reason, State}            (terminate/2 is called)
 %%--------------------------------------------------------------------
-hande_cast({asyn_input, Type, Cmd}, #state{tl1_tcp = Pids} = State) ->
+handle_cast({asyn_input, Type, Cmd}, #state{tl1_tcp = Pids} = State) ->
     ?INFO("handle_cast, Cmd,~p", [Cmd]),
     case get_tl1_tcp(Type, Pids) of
         [] ->

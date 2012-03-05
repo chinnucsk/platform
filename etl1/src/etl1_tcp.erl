@@ -5,7 +5,7 @@
 -behaviour(gen_server2).
 
 %% Network Interface callback functions
--export([start_link/1, start_link/2,
+-export([start_link/2, start_link/3,
         get_status/1,
         send_tcp/2]).
 
@@ -40,13 +40,13 @@
 %%%-------------------------------------------------------------------
 %%% API
 %%%-------------------------------------------------------------------
-start_link(NetIfOpts) ->
+start_link(Server, NetIfOpts) ->
     ?WARNING("start etl1_tcp....~p",[NetIfOpts]),
-	gen_server2:start_link(?MODULE, [NetIfOpts], []).
+	gen_server2:start_link(?MODULE, [Server, NetIfOpts], []).
 
-start_link(Name, NetIfOpts) ->
+start_link(Server, Name, NetIfOpts) ->
     ?WARNING("start etl1_tcp....~p,~p",[Name, NetIfOpts]),
-	gen_server2:start_link({local, Name}, ?MODULE, [NetIfOpts], []).
+	gen_server2:start_link({local, Name}, ?MODULE, [Server, NetIfOpts], []).
 
 login_state(Pid, LoginState) ->
     gen_server2:cast(Pid, {login_state, LoginState}).
