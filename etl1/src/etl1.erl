@@ -44,7 +44,7 @@ start_link(Name, Tl1Options) ->
 	gen_server:start_link({local, Name},?MODULE, [Tl1Options], []).
 
 register_callback(Pid, Callback) ->
-    gen_server:cast(Pid, {callback, Callback}).
+    gen_server:call(Pid, {callback, Callback}).
 
 get_tl1() ->
     gen_server:call(?MODULE, get_tl1, ?CALL_TIMEOUT).
@@ -160,8 +160,12 @@ do_connect2(Tl1Info) ->
 %%          {stop, Reason, Reply, State}   | (terminate/2 is called)
 %%          {stop, Reason, State}            (terminate/2 is called)
 %%--------------------------------------------------------------------
-handle_call({callback, _From, Callback}, #state{callback = Pids} = State) ->
-    {reply, ok, State#state{callback = [Callback|Pids]}};
+handle_call({callback, Callback}, _From, #state{callback = Pids} = State) ->
+    NewCall = case Pids of
+        undefined -> [Callback];
+        _ -> [Callback|Pids]
+     end,
+    {reply, ok, State#state{callback = NewCall}};
 
 handle_call(get_tl1, _From, #state{tl1_tcp = Pids} = State) ->
     Result = lists:map(fun({_Type, Pid}) ->
