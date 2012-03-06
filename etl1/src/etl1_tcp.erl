@@ -184,9 +184,9 @@ handle_info({tcp, Sock, Bytes}, #state{socket = Sock, rest = Rest, data = Data, 
        end,
     {noreply, State#state{rest = NewRest, data = NewData, conn_num = NewConnNum}};
 
-handle_info({tcp_closed, Socket}, #state{socket = Socket, host = Host, port = Port} = State) ->
-    ?ERROR("tcp close: ~p,~p,~p", [Host, Port, Socket]),
-    retry_connect(),
+handle_info({tcp_closed, Socket}, #state{server = Server} = State) ->
+    ?ERROR("tcp close: ~p,~p,~p", [Socket]),
+    Server ! {tcp_closed, self()},
     {noreply, State#state{socket = null, conn_state = disconnect}};
 
 
