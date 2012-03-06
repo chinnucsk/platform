@@ -6,12 +6,12 @@
 
 %% Network Interface callback functions
 -export([start_link/1, start_link/2,
-        register_callback/2,
+        register_callback/1, register_callback/2,
         set_tl1/1,
         get_tl1/0, get_tl1_req/0,
         input/2, input/3,
         input_group/2, input_group/3,
-        input_asyn/3
+        input_asyn/2, input_asyn/3
      ]).
 
 %% gen_server callbacks
@@ -29,9 +29,9 @@
 
 -import(extbif, [to_list/1, to_binary/1, to_integer/1]).
 
--record(request,  {id, type, data, ref, timeout, time, from}).
+-record(request,  {id, type, ems, data, ref, timeout, time, from}).
 
--record(state, {tl1_tcp, req_id=0, callback=[]}).
+-record(state, {tl1_tcp, req_id=0, req_type, callback=[]}).
 
 %%%-------------------------------------------------------------------
 %%% API
@@ -43,6 +43,9 @@ start_link(Tl1Options) ->
 start_link(Name, Tl1Options) ->
     ?INFO("start etl1....~p",[Tl1Options]),
 	gen_server:start_link({local, Name},?MODULE, [Tl1Options], []).
+
+register_callback(Callback) ->
+    gen_server:call(?MODULE, {callback, Callback}).
 
 register_callback(Pid, Callback) ->
     gen_server:call(Pid, {callback, Callback}).
@@ -94,6 +97,9 @@ input_group(Type, Cmd, Timeout) ->
         Other ->
             Other
     end.
+
+input_asyn(Type, Cmd) ->
+    gen_server:get_cast(?MODULE, {asyn_input, Type, Cmd}).
 
 input_asyn(Pid, Type, Cmd) ->
     gen_server:get_cast(Pid, {asyn_input, Type, Cmd}).
@@ -161,8 +167,9 @@ do_connect2(Tl1Info) ->
 %%          {stop, Reason, Reply, State}   | (terminate/2 is called)
 %%          {stop, Reason, State}            (terminate/2 is called)
 %%--------------------------------------------------------------------
-handle_call({callback, Callback}, _From, #state{callback = Pids} = State) ->
-    {reply, ok, State#state{callback = [Callback|Pids]}};
+handle_call({callback, {Name, Pid}}, _From, #state{callback = Pids} = State) ->
+    NewCall = lists:keystore(Name, 1, Pids, {Name, Pid}),
+    {reply, ok, State#state{callback = NewCall}};
 
 handle_call(get_tl1, _From, #state{tl1_tcp = Pids} = State) ->
     Result = lists:map(fun({_Type, Pid}) ->
@@ -206,11 +213,11 @@ handle_cast({asyn_input, Type, Cmd}, #state{tl1_tcp = Pids} = State) ->
     ?INFO("handle_cast, Cmd,~p", [Cmd]),
     case get_tl1_tcp(Type, Pids) of
         [] ->
-            ?ERROR("error:type:~p, state:~p",[Type,State]);
+            ?ERROR("error:type:~p, state:~p",[Type,State]),
+            {noreply, State};
         [Pid] ->
-            handle_asyn_input(Pid, Cmd, State)
-    end,
-    {noreply, State};
+            handle_asyn_input(Pid, Cmd, Type, State)
+    end;
 
 handle_cast(Msg, State) ->
     ?WARNING("unexpected message: ~n~p", [Msg]),
@@ -235,7 +242,7 @@ handle_info({sync_timeout, ReqId, From}, State) ->
     {noreply, State};
 
 handle_info({tl1_error, Pct, Reason}, State) ->
-    handle_tl1_error(Pct, Reason),
+    handle_tl1_error(Pct, Reason, State),
     {noreply, State};
 
 handle_info({tl1_tcp, Pct}, State) ->
@@ -291,7 +298,7 @@ handle_sync_input(Pid, Cmd, Timeout, From, #state{req_id = ReqId} = State) ->
     ets:insert(tl1_request_table, Req),
     {ok, State#state{req_id = NextReqId}}.
 
-handle_asyn_input(Pid, Cmd, #state{req_id = ReqId} = State) ->
+handle_asyn_input(Pid, Cmd, Ems, #state{req_id = ReqId} = State) ->
     NextReqId = get_next_reqid(ReqId),
     ?INFO("input reqid:~p, cmd:~p, state:~p",[NextReqId, Cmd, State]),
     Session = #pct{request_id = NextReqId,
@@ -300,21 +307,27 @@ handle_asyn_input(Pid, Cmd, #state{req_id = ReqId} = State) ->
                data = Cmd},
     etl1_tcp:send_tcp(Pid, {send_req, Session, Cmd}),
     Req    = #request{id = NextReqId,
-              type    = iuput,
+              type    = asyn_input,
+              ems     = Ems,
               data    = Cmd,
               time    = extbif:timestamp()},
     ets:insert(tl1_request_table, Req),
-    {ok, State#state{req_id = NextReqId}}.
+    {noreply, State#state{req_id = NextReqId}}.
 
 
 %% send error
-handle_tl1_error(#pct{request_id = ReqId} = Pct, Reason) ->
+handle_tl1_error(#pct{request_id = ReqId} = Pct, Reason, #state{callback = Callback} = _State) ->
     case ets:lookup(tl1_request_table, ReqId) of
 	[#request{type = 'input', ref = _Ref, from = From}] ->
-	    Reply = {error, Reason},
-	    gen_server:reply(From, Reply),
+	    gen_server:reply(From, {error, Reason}),
 	    ets:delete(tl1_request_table, ReqId),
 	    ok;
+	[#request{type = 'asyn_input',data = Cmd, time = Time}] ->
+        Now = extbif:timestamp(),
+        ?INFO("recv tcp reqid:~p, time:~p, cmd :~p",[ReqId, Now - Time, Cmd]),
+        lists:map(fun({_Name, Pid}) ->
+            Pid ! {asyn_data, {error, Reason}}
+        end, Callback);
 	_ ->
 		?ERROR("unexpected tl1, reqid:~p, ~n error: ~p",[Pct, Reason])
     end.
@@ -337,11 +350,11 @@ handle_recv_tcp(#pct{request_id = ReqId, type = 'output', complete_code = CompCo
             gen_server:reply(From, Reply),
             ets:delete(tl1_request_table, ReqId),
             ok;
-       [#request{type = 'asyn_input',data = Cmd, time = Time}] ->
+       [#request{type = 'asyn_input',ems = {Type, Cityid}, data = Cmd, time = Time}] ->
            Now = extbif:timestamp(),
            ?INFO("recv tcp reqid:~p, time:~p, cmd :~p",[ReqId, Now - Time, Cmd]),
-            lists:map(fun(Pid) ->
-                Reply = {ok, Data},
+            lists:map(fun({_Name, Pid}) ->
+                Reply = {asyn_data, Data, {Type, Cityid}},
                 Pid ! Reply
             end, Callback);
 	_ ->
@@ -358,7 +371,7 @@ handle_recv_tcp(Pct, _State) ->
     ?ERROR("received crap  type:~p, Pct :~p", [Pct]),
     ok.
 
-%% sencond fun
+%% second fun
 cancel_timer(undefined) ->
     ok;
 cancel_timer(Ref) ->
