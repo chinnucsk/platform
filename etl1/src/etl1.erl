@@ -99,10 +99,10 @@ input_group(Type, Cmd, Timeout) ->
     end.
 
 input_asyn(Type, Cmd) ->
-    gen_server:get_cast(?MODULE, {asyn_input, Type, Cmd}).
+    gen_server:cast(?MODULE, {asyn_input, Type, Cmd}).
 
 input_asyn(Pid, Type, Cmd) ->
-    gen_server:get_cast(Pid, {asyn_input, Type, Cmd}).
+    gen_server:cast(Pid, {asyn_input, Type, Cmd}).
 
 %%%-------------------------------------------------------------------
 %%% Callback functions from gen_server
@@ -289,7 +289,7 @@ handle_sync_input(Pid, Cmd, Timeout, From, #state{req_id = ReqId} = State) ->
     Msg    = {sync_timeout, NextReqId, From},
     Ref    = erlang:send_after(Timeout, self(), Msg),
     Req    = #request{id = NextReqId,
-              type    = iuput,
+              type    = 'input',
               data    = Cmd,
               ref     = Ref,
               time    = extbif:timestamp(),
@@ -307,7 +307,7 @@ handle_asyn_input(Pid, Cmd, Ems, #state{req_id = ReqId} = State) ->
                data = Cmd},
     etl1_tcp:send_tcp(Pid, {send_req, Session, Cmd}),
     Req    = #request{id = NextReqId,
-              type    = asyn_input,
+              type    = 'asyn_input',
               ems     = Ems,
               data    = Cmd,
               time    = extbif:timestamp()},
@@ -352,7 +352,7 @@ handle_recv_tcp(#pct{request_id = ReqId, type = 'output', complete_code = CompCo
             ok;
        [#request{type = 'asyn_input',ems = {Type, Cityid}, data = Cmd, time = Time}] ->
            Now = extbif:timestamp(),
-           ?INFO("recv tcp reqid:~p, time:~p, cmd :~p",[ReqId, Now - Time, Cmd]),
+           ?INFO("recv tcp reqid:~p, ems:~p, time:~p, cmd :~p",[ReqId, {Type, Cityid}, Now - Time, Cmd]),
             lists:map(fun({_Name, Pid}) ->
                 Reply = {asyn_data, Data, {Type, Cityid}},
                 Pid ! Reply
