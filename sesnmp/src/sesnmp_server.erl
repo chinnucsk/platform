@@ -51,12 +51,18 @@ do_init() ->
     process_flag(trap_exit, true),
     {A,B,C} = erlang:now(),
     random:seed(A,B,C),
-    ReqId = random:uniform(2147483647),
+	%fix bug#2817
+    ReqId = random:uniform(1000),
     ets:new(sesnmp_request_table, [set, named_table, protected, {keypos, #request.id}]),
     {ok, #state{req_id = ReqId}}.
 
+	%fix bug#2817
 handle_call(next_req_id, _From, #state{req_id = Id} = State) ->
-    Id2 = Id + 1,
+    Id2 = 
+	if 
+	Id > 16#0FFFFFFF -> 1;
+	true -> Id + 1
+	end,
     {reply, Id2, State#state{req_id = Id2}};
 
 handle_call({insert, Req}, _From, State) ->
