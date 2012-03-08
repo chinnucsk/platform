@@ -17,12 +17,12 @@
 %   ZTE_192.168.41.10 2011-07-19 16:45:35
 %   M  CTAG DENY
 process_msg(MsgData) when is_binary(MsgData) ->
-    ?LOG("get respond :~p", [MsgData]),
+    log("get respond :~p", [MsgData]),
     Lines = string:tokens(to_list(MsgData), "\r\n"),
     process_msg(Lines);
 
 process_msg(Lines) ->
-    ?LOG("get respond splite :~p", [Lines]),
+    log("get respond splite :~p", [Lines]),
     _Header = lists:nth(1, Lines),
     RespondId = lists:nth(2, Lines),
     {ReqLevel, ReqId, CompletionCode} = get_response_id(RespondId),
@@ -31,7 +31,7 @@ process_msg(Lines) ->
 
  process_msg({"ALARM", ReqId, TrapLevel}, RespondBlock) ->
     TrapData = get_trap_body(TrapLevel, RespondBlock),
-    ?LOG("get trap data ~p", [TrapData]),
+    log("get trap data ~p", [TrapData]),
     Pct = #pct{request_id = ReqId,
                type = 'alarm',
                data =  {ok, TrapData}
@@ -50,7 +50,7 @@ process_msg(Lines) ->
             {error, {tl1_cmd_error, [{en, En}, {endesc, Endesc}, {reason, Reason}]}}
      end,
     Terminator = lists:last(RespondBlock),
-    ?LOG("reqid:~p,comp_code: ~p, terminator: ~p, data:~p",[ReqId, CompletionCode, Terminator, RespondData]),
+    log("reqid:~p,comp_code: ~p, terminator: ~p, data:~p",[ReqId, CompletionCode, Terminator, RespondData]),
     Pct = #pct{request_id = ReqId,
                type = 'output',
                complete_code = CompletionCode,
@@ -109,7 +109,7 @@ get_response_data(Block) ->
     {PackageRecordsNo, Block2} = get_response_data("block_records=", Block1),
     {Title, Block3} = get_response_data("list |List |LST ", Block2),
     {_SpliteLine, Block4} = get_response_data("---", Block3),
-    ?LOG("get response:~p", [{TotalPackageNo, CurrPackageNo, PackageRecordsNo, Title}]),
+    log("get response:~p", [{TotalPackageNo, CurrPackageNo, PackageRecordsNo, Title}]),
     case get_response_data(fields, Block4) of
 			{fields, []} ->
                 no_data;
@@ -201,3 +201,7 @@ generate_msg(Pct, MsgData) ->
         Cmd -> {discarded, no_ctag};
         NewString -> {ok, NewString}
     end.
+
+log(Format, Args) ->
+%    ok.
+    ?INFO(Format, Args).
