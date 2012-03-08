@@ -9,7 +9,7 @@
         get_status/1,
         shakehand/1,
         send_req/3,
-        send_tcp/1]).
+        send_tcp/2]).
 
 %% gen_server callbacks
 -export([init/1,
