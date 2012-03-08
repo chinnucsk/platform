@@ -30,3 +30,5 @@
 -define(CRITICAL(Format, Args),
     elog_logger:critical_msg(?MODULE,?LINE,Format, Args)).
 
+-define(LOG(Format, Args),
+    elog_logger:info_msg(?MODULE,?LINE,Format, Args)).
