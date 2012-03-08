@@ -53,7 +53,6 @@ register_callback(Pid, Callback) ->
 get_tl1() ->
     gen_server:call(?MODULE, get_tl1, ?CALL_TIMEOUT).
 
-
 get_tl1_req() ->
     [{tl1_timeout, ets:info(tl1_request_timeout, size)}, {tl1_table, ets:info(tl1_request_table, size)}].
 
@@ -245,9 +244,14 @@ handle_info({tl1_error, Pct, Reason}, State) ->
     handle_tl1_error(Pct, Reason, State),
     {noreply, State};
 
-handle_info({tl1_tcp, Pct}, State) ->
+handle_info({tl1_login, Tcp, {login_state, _LoginState}}, State) ->
+    etl1_tcp:shakehand(Tcp),
+    {noreply, State};
+    
+handle_info({tl1_tcp, _Tcp, Pct}, State) ->
     handle_recv_tcp(Pct, State),
     {noreply, State};
+
 
 handle_info({'EXIT', Pid, Reason}, #state{tl1_tcp = Pids} = State) ->
     Type = [T || {T, P} <- Pids, P == Pid],
@@ -285,7 +289,7 @@ handle_sync_input(Pid, Cmd, Timeout, From, #state{req_id = ReqId} = State) ->
                type = 'input',
                complete_code = 'REQ',
                data = Cmd},
-    etl1_tcp:send_tcp(Pid, {send_req, Session, Cmd}),
+    etl1_tcp:send_req(Pid, Session, Cmd),
     Msg    = {sync_timeout, NextReqId, From},
     Ref    = erlang:send_after(Timeout, self(), Msg),
     Req    = #request{id = NextReqId,
@@ -305,7 +309,7 @@ handle_asyn_input(Pid, Cmd, Ems, #state{req_id = ReqId} = State) ->
                type = 'asyn_input',
                complete_code = 'REQ',
                data = Cmd},
-    etl1_tcp:send_tcp(Pid, {send_req, Session, Cmd}),
+    etl1_tcp:send_req(Pid, Session, Cmd),
     Req    = #request{id = NextReqId,
               type    = 'asyn_input',
               ems     = Ems,
@@ -368,7 +372,7 @@ handle_recv_tcp(#pct{request_id = ReqId, type = 'output', complete_code = CompCo
         end
 	end;
 handle_recv_tcp(Pct, _State) ->
-    ?ERROR("received crap  type:~p, Pct :~p", [Pct]),
+    ?ERROR("received crap  pct :~p", [Pct]),
     ok.
 
 %% second fun

@@ -25,11 +25,23 @@ process_msg(Lines) ->
     ?INFO("get respond splite :~p", [Lines]),
     _Header = lists:nth(1, Lines),
     RespondId = lists:nth(2, Lines),
-    {ReqId, CompletionCode} = get_response_id(RespondId),
+    {ReqLevel, ReqId, CompletionCode} = get_response_id(RespondId),
     RespondBlock = lists:nthtail(2, Lines),
+    process_msg({CompletionCode, ReqId, ReqLevel}, RespondBlock).
+
+ process_msg({"ALARM", ReqId, TrapLevel}, RespondBlock) ->
+    TrapData = get_trap_body(TrapLevel, RespondBlock),
+    ?INFO("get trap data ~p", [TrapData]),
+    Pct = #pct{request_id = ReqId,
+               type = 'alarm',
+               data =  {ok, TrapData}
+               },
+   {ok, Pct};
+
+ process_msg({CompletionCode, ReqId, _ReqLevel}, RespondBlock) ->
     {{En, Endesc}, Rest} = get_response_status(RespondBlock),
 %    ?INFO("get en endesc :~p data:~p",[{En,Endesc}, Rest]),
-    RespondData = case get_response(CompletionCode, Rest) of
+    RespondData = case get_response_body(CompletionCode, Rest) of
         no_data ->
             {ok, [[{en, En}, {endesc, Endesc}]]};
         {data, #tl1_response{fields = Fileds, records = Records}} ->
@@ -37,7 +49,7 @@ process_msg(Lines) ->
         {error, Reason} ->
             {error, {tl1_cmd_error, [{en, En}, {endesc, Endesc}, {reason, Reason}]}}
      end,
-    Terminator = lists:last(Lines),
+    Terminator = lists:last(RespondBlock),
     ?INFO("reqid:~p,comp_code: ~p, terminator: ~p, data:~p",[ReqId, CompletionCode, Terminator, RespondData]),
     Pct = #pct{request_id = ReqId,
                type = 'output',
@@ -47,11 +59,28 @@ process_msg(Lines) ->
                },
     {ok, Pct}.
 
+
+%%%% second function %%%%
 get_response_id(RespondId) ->
     Data = string:tokens(RespondId, " "),
+    ReqLevel = lists:nth(1, Data),
     ReqId = lists:nth(2, Data),
     CompletionCode = lists:last(Data),
-    {ReqId, CompletionCode}.
+    {ReqLevel, ReqId, CompletionCode}.
+
+get_trap_body(TrapLevel, TrapBody) ->
+    Datas = get_rows(TrapBody),
+    lists:map(fun(Data) ->
+          Rest =  lists:map(fun(Item) ->
+              case string:tokens(Item, "=") of
+                [Name,Value] ->
+                    {list_to_atom(Name), Value};
+                _ ->
+                  []
+              end
+          end, Data),
+         {ok, [{alarm_level, TrapLevel}|lists:flatten(Rest)]}
+    end, Datas).
 
 get_response_status([Status|Data]) ->
     {En, Rest} = get_status("EN=", Status),
@@ -64,12 +93,12 @@ get_response_status([Status|Data]) ->
      end.       
 
 %DELAY, DENY, PRTL, RTRV
-get_response("COMPLD", Data)->
+get_response_body("COMPLD", Data)->
     %\r\n\r\n -> error =[]
      get_response_data(Data);
-get_response("PRTL", Data)->
+get_response_body("PRTL", Data)->
      get_response_data(Data);
-get_response(_CompCode, Data)->
+get_response_body(_CompCode, Data)->
      {error, string:join(Data, ",")}.
 
 

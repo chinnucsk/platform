@@ -7,7 +7,9 @@
 %% Network Interface callback functions
 -export([start_link/2, start_link/3,
         get_status/1,
-        send_tcp/2]).
+        shakehand/1,
+        send_req/3,
+        send_tcp/1]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -20,16 +22,16 @@
 
 -include("elog.hrl").
 
--define(USERNAME, "root").
--define(PASSWORD, "public").
-
 -define(TCP_OPTIONS, [binary, {packet, 0}, {active, true}, {reuseaddr, true}, {send_timeout, 6000}]).
 
 -define(TIMEOUT, 12000).
 
+-define(USERNAME, "root").
+-define(PASSWORD, "public").
 -define(MAX_CONN, 100).
 
--record(state, {server, host, port, username, password, socket, tl1_table, conn_num, max_conn, conn_state, login_state, rest, data}).
+-record(state, {server, host, port, username, password, max_conn,
+        socket, tl1_table, conn_num, conn_state, login_state, rest, data}).
 
 -include("tl1.hrl").
 
@@ -54,8 +56,14 @@ login_state(Pid, LoginState) ->
 get_status(Pid) ->
     gen_server2:call(Pid, get_status, 6000).
 
-send_tcp(Pid, Ptc)  ->
-    gen_server2:cast(Pid, Ptc).
+shakehand(Pid) ->
+    gen_server2:cast(Pid, shakehand).
+
+send_req(Pid, Session, Cmd) ->
+    gen_server2:cast(Pid, {send_req, Session, Cmd}).
+
+send_tcp(Pid, Cmd) ->
+    gen_server2:cast(Pid, {send, Cmd}).
 
 %%%-------------------------------------------------------------------
 %%% Callback functions from gen_server
@@ -87,8 +95,8 @@ do_init(Server, Args) ->
     MaxConn = proplists:get_value(max_conn, Args, ?MAX_CONN),
     {ok, Socket, ConnState} = connect(Host, Port, Username, Password),
     %%-- We are done ---
-    {ok, #state{server = Server, host = Host, port = Port, username = Username, password = Password,
-        socket = Socket, tl1_table = Tl1Table, conn_num = 0, max_conn = MaxConn, conn_state = ConnState, rest = <<>>, data = []}}.
+    {ok, #state{server = Server, host = Host, port = Port, username = Username, password = Password, max_conn = MaxConn, 
+        socket = Socket, tl1_table = Tl1Table, conn_num = 0, conn_state = ConnState, rest = <<>>, data = []}}.
 
 connect(Host, Port, Username, Password) when is_binary(Host) ->
     connect(binary_to_list(Host), Port, Username, Password);
@@ -139,7 +147,16 @@ handle_call(Req, _From, State) ->
 %%          {noreply, State, Timeout} |
 %%          {stop, Reason, State}            (terminate/2 is called)
 %%--------------------------------------------------------------------
-handle_cast({send_req, Pct, _Cmd}, #state{tl1_table = Tl1Table,conn_num = ConnNum, conn_state = connected} = State) when ConnNum > ?MAX_CONN ->
+handle_cast({send, Cmd}, #state{conn_state = connected, socket = Sock} = State) ->
+    tcp_send(Sock, Cmd),
+    {noreply, State};
+
+handle_cast({send, _Cmd}, #state{server = Server, conn_state = ConnState, host = Host, port = Port} = State) ->
+    Server ! {tl1_error, self(), {conn_failed, ConnState, Host, Port}},
+    {noreply, State};
+
+handle_cast({send_req, Pct, _Cmd}, #state{tl1_table = Tl1Table,conn_num = ConnNum,
+    conn_state = connected} = State) when ConnNum > ?MAX_CONN ->
     ets:insert(Tl1Table, Pct),
     {noreply, State};
 
@@ -153,7 +170,6 @@ handle_cast({send_req, Pct, _Cmd}, #state{server = Server, conn_state = ConnStat
 
 handle_cast({login_state, LoginState}, State) ->
     ?INFO("login state ...~p, ~p", [LoginState, self()]),
-    erlang:send_after(6 * 1000, self(), shakehand),
     {noreply, State#state{login_state = LoginState}};
 
 handle_cast(Msg, State) ->
@@ -184,15 +200,13 @@ handle_info({tcp, Sock, Bytes}, #state{socket = Sock, rest = Rest, data = Data, 
        end,
     {noreply, State#state{rest = NewRest, data = NewData, conn_num = NewConnNum}};
 
-handle_info({tcp_closed, Socket}, #state{server = Server} = State) ->
+handle_info({tcp_closed, Socket}, State) ->
     ?ERROR("tcp close: ~p,~p,~p", [Socket]),
-    Server ! {tcp_closed, self()},
     {noreply, State#state{socket = null, conn_state = disconnect}};
 
 
 handle_info(shakehand, #state{conn_num = ConnNum, socket = Socket, conn_state = connected} = State) ->
     tcp_send(Socket, "SHAKEHAND:::shakehand::;"),
-%    ?INFO("send shakehand...~p",[State]),
     erlang:send_after(5 * 60 * 1000, self(), shakehand),
     {noreply, State#state{conn_num = ConnNum + 1}};
 
@@ -317,8 +331,8 @@ handle_recv_wait(<<>>, Data) ->
     Data;
 handle_recv_wait(Bytes, Data) when is_binary(Bytes)->
     case (catch etl1_mpd:process_msg(Bytes)) of
-	{ok, Pct} when is_record(Pct, pct) ->
-        case Pct#pct.data of
+	{ok, #pct{data = NewData} = _Pct}  ->
+        case NewData of
             {ok, Data0} ->
                 Data ++ Data0;
             {error, _Reason} ->
@@ -331,37 +345,33 @@ handle_recv_wait(Bytes, Data) when is_binary(Bytes)->
 
 handle_recv_msg(<<>>, _State)  ->
     ok;
-handle_recv_msg(Bytes, #state{server = Server, data = Data, socket = Socket, username = Username, password = Password} = State) ->
+handle_recv_msg(Bytes, #state{server = Server, data = Data, socket = Socket, 
+    username = Username, password = Password} = State) ->
     case (catch etl1_mpd:process_msg(Bytes)) of
-	%% BMK BMK BMK
-	%% Do we really need message size here??
-	{ok, #pct{type = 'autonomous'} = Pct} ->
-	    ?WARNING("unexpected autonomous message:~p", [Pct]),
-        %if port of revice autonomous is the same to input, can TODO
-        noreply;
-        
-%	{ok, _Vsn, #pdu{type = 'acknowledgment'} = Pdu, _MS, _ACM} ->
-    {ok, #pct{type = 'output', complete_code = "DENY", en = "AAFD"}} ->
-        ?WARNING("begin to relogin...~p", [State]),
-        login(Socket, Username, Password);
-    {ok, #pct{request_id = "shakehand", type = 'output',complete_code =_CompletionCode}} ->
-        ok;
-    {ok, #pct{request_id = "login", type = 'output',complete_code =CompletionCode}} ->
-        LoginState = case CompletionCode of
-            "COMPLD" -> succ;
-            "DENY" -> fail
-        end,
-        login_state(self(), LoginState);
-	{ok, Pct} when is_record(Pct, pct) ->
-        NewData = case Pct#pct.data of
-            {ok, Data2} ->
-                {ok, Data ++ Data2};
-            {error, _Reason} ->
-                {error, _Reason}
-        end,
-        Server ! {tl1_tcp, Pct#pct{data = NewData}};
+        {ok, #pct{complete_code = "DENY", en = "AAFD"}} ->
+            ?WARNING("begin to relogin...~p", [State]),
+            login(Socket, Username, Password);
+        {ok, #pct{request_id = "shakehand", complete_code = _CompletionCode}} ->
+            ok;
+        {ok, #pct{request_id = "login", complete_code = CompletionCode}} ->
+            LoginState = case CompletionCode of
+                "COMPLD" -> succ;
+                "DENY" -> fail
+            end,
+            login_state(self(), LoginState),
+            Server ! {tl1_login, self(), {login_state, LoginState}};
+        {ok, #pct{type = 'alarm', data = {ok, Data2}} = _Pct}  ->
+            Server ! {tl1_trap, self(), Data ++ Data2};
+        {ok, #pct{type = 'output', data = NewData} = Pct}  ->
+            AccData = case NewData of
+                {ok, Data2} ->
+                    {ok, Data ++ Data2};
+                {error, _Reason} ->
+                    {error, _Reason}
+            end,
+            Server ! {tl1_tcp, self(), Pct#pct{data = AccData}};
 
-	Error ->
-	    ?ERROR("processing of received message failed: ~n ~p", [Error]),
-	    ok
+        Error ->
+            ?ERROR("processing of received message failed: ~n ~p", [Error]),
+            ok
     end.
