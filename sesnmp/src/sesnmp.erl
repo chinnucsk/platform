@@ -1,7 +1,7 @@
 -module(sesnmp).
 
 -export([get_group/2, get_group/3, get_group/4, get_group/5,
-         get_table/2, get_table/3, get_table/4,
+         get_table/2, get_table/3, get_table/4, get_table/7,
          get_entry/3, get_entry/4, get_entry/5,
          set/3, set/4
      ]).

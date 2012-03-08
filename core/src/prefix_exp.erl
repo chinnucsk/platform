@@ -4,7 +4,7 @@
 
 -import(lists, [foldl/3, keysearch/3]).
 
--export([is_digital/1, scan/1, parse/1, valid/1, eval/2]).
+-export([is_digital/1, scan/1, parse/1, valid/1, eval/2, get_name/2]).
 
 %%string -> tokens
 scan(S) ->
@@ -174,6 +174,18 @@ valid({'<=', Name, _Val}) when is_atom(Name) ->
 valid(Exp) ->
     throw({invalid_syntax, Exp}).
 
+
+get_name({_, SubExps}, Args) ->
+    get_name(SubExps, Args, []);
+get_name({_, Name, _Val}, Args) ->
+    {value, {_, ArgVal}} = keysearch(Name, 1, Args),
+    [{Name, ArgVal}].
+    
+get_name([], _Args, Acc) ->
+    lists:flatten(Acc);
+get_name([SubExp|T], Args, Acc) ->
+    get_name(T, Args, [get_name(SubExp, Args)|Acc]).
+
 eval({'|', SubExps} = _Exp, Args) ->
     eval_or(SubExps, Args);
 
@@ -185,11 +197,11 @@ eval({'!', SubExp} = _Exp, Args) when is_tuple(SubExp) ->
 
 eval({'>', Name, Val}, Args) ->
     {value, {_, ArgVal}} = keysearch(Name, 1, Args),
-    ArgVal > to_integer(Val);
+    to_integer(ArgVal) > to_integer(Val);
 
 eval({'<', Name, Val}, Args) ->
     {value, {_, ArgVal}} = keysearch(Name, 1, Args),
-    ArgVal < to_integer(Val);
+    to_integer(ArgVal) < to_integer(Val);
 
 eval({'!=', Name, Val}, Args) ->
     {value, {_, ArgVal}} = keysearch(Name, 1, Args),
@@ -203,11 +215,11 @@ eval({'=', Name, Val}, Args) ->
 
 eval({'>=', Name, Val}, Args) ->
     {value, {_, ArgVal}} = keysearch(Name, 1, Args),
-    ArgVal >= to_integer(Val);
+    to_integer(ArgVal) >= to_integer(Val);
 
 eval({'<=', Name, Val}, Args) ->
     {value, {_, ArgVal}} = keysearch(Name, 1, Args),
-    ArgVal =< to_integer(Val).
+    to_integer(ArgVal) =< to_integer(Val).
 
 eval_or([], _Args) ->
     false;
