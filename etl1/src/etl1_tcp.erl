@@ -57,7 +57,7 @@ get_status(Pid) ->
     gen_server2:call(Pid, get_status, 6000).
 
 shakehand(Pid) ->
-    gen_server2:cast(Pid, shakehand).
+    Pid ! shakehand.
 
 send_req(Pid, Session, Cmd) ->
     gen_server2:cast(Pid, {send_req, Session, Cmd}).
