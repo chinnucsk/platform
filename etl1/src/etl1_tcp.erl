@@ -91,7 +91,7 @@ init([Server, Args]) ->
     end.
 
 do_init(Server, Args) ->
-    Tl1Table = ets:new(tl1_table, [ordered_set, {keypos, #pct.request_id}]),
+    Tl1Table = ets:new(tl1_table, [ordered_set, {keypos, #pct.id}]),
     %% -- Socket --
     Host = proplists:get_value(host, Args),
     Port = proplists:get_value(port, Args),
@@ -165,9 +165,9 @@ handle_cast(_, #state{server = Server, conn_state = disconnect} = State) ->
     {noreply, State};
 
 handle_cast({send, Pct}, #state{count = Count, tl1_table = Tl1Table, login_state = undefined} = State) ->
-    ?INFO("hold on, need login first : ~p", [Pct]),
     NewId = get_next_id(Count),
     NewPct = Pct#pct{id = NewId},
+    ?INFO("hold on, need login first : ~p", [Pct]),
     ets:insert(Tl1Table, NewPct),
     {noreply, State#state{count = NewId}};
 
@@ -274,7 +274,7 @@ retry_connect() ->
     erlang:send_after(30000, self(), {timeout, retry_connect}).
 
 clean_tl1_table(#state{tl1_table = Tl1Table} = State) ->
-    ?INFO("begin to clean tl1table:~p", ets:info(Tl1Table, size)),
+    ?INFO("begin to clean tl1table:~p", [{ets:info(Tl1Table, size), ets:first(Tl1Table)}]),
     clean_tl1_table(ets:first(Tl1Table), State).
 
 clean_tl1_table('$end_of_table', _State) ->
