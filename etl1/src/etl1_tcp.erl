@@ -167,7 +167,7 @@ handle_cast(_, #state{server = Server, conn_state = disconnect} = State) ->
 handle_cast({send, Pct}, #state{count = Count, tl1_table = Tl1Table, login_state = undefined} = State) ->
     NewId = get_next_id(Count),
     NewPct = Pct#pct{id = NewId},
-    ?INFO("hold on, need login first : ~p", [Pct]),
+    ?INFO("hold on, need login first : ~p", [NewPct]),
     ets:insert(Tl1Table, NewPct),
     {noreply, State#state{count = NewId}};
 
