@@ -203,5 +203,4 @@ generate_msg(Pct, MsgData) ->
     end.
 
 log(Format, Args) ->
-%    ok.
-    ?INFO(Format, Args).
+    ok.

@@ -86,7 +86,6 @@ init([Server, Args]) ->
     end.
 
 do_init(Server, Args) ->
-    process_flag(trap_exit, true),
     Tl1Table = ets:new(tl1_table, [ordered_set, {keypos, #pct.request_id}]),
     %% -- Socket --
     Host = proplists:get_value(host, Args),
@@ -149,6 +148,7 @@ handle_call(Req, _From, State) ->
 %%          {stop, Reason, State}            (terminate/2 is called)
 %%--------------------------------------------------------------------
 handle_cast({send, Cmd}, #state{conn_state = connected, socket = Sock} = State) ->
+    log("send cmd: ~p", [Cmd]),
     tcp_send(Sock, Cmd),
     {noreply, State};
 
@@ -184,7 +184,7 @@ handle_cast(Msg, State) ->
 %%          {stop, Reason, State}            (terminate/2 is called)
 %%--------------------------------------------------------------------
 handle_info({tcp, Sock, Bytes}, #state{socket = Sock, rest = Rest, data = Data, conn_num = ConnNum} = State) ->
-    log("received tcp ~p ", [Bytes]),
+%    log("received tcp ~p ", [Bytes]),
     {NewData, NewRest, NewConnNum} = case binary:last(Bytes) of
         $; ->
             NowBytes = binary:split(list_to_binary([Rest, Bytes]), <<">">>, [global]),
@@ -378,5 +378,4 @@ handle_recv_msg(Bytes, #state{server = Server, data = Data, socket = Socket,
     end.
 
 log(Format, Args) ->
-%    ok.
     ?INFO(Format, Args).
