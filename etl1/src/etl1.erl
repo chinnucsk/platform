@@ -250,6 +250,8 @@ handle_info({tl1_tcp, _Tcp, Pct}, State) ->
     handle_recv_tcp(Pct, State),
     {noreply, State};
 
+%handle_info({tl1_tcp_closed, _Tcp}, State) ->
+%    {noreply, State};
 
 handle_info({'EXIT', Pid, Reason}, #state{tl1_tcp = Pids} = State) ->
     Type = [T || {T, P} <- Pids, P == Pid],

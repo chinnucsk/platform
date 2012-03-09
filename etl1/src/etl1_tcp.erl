@@ -8,7 +8,8 @@
 -export([start_link/2, start_link/3,
         get_status/1,
         shakehand/1,
-        send_tcp/2]).
+        send_tcp/2,
+        reconnect/1]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -69,6 +70,9 @@ send_tcp(Pid, Cmd) ->
                 data = Cmd
             },
     gen_server2:cast(Pid, {send, Pct}).
+
+reconnect(Pid) ->
+    gen_server2:call(Pid, reconnect).
 
 
 %%%-------------------------------------------------------------------
@@ -137,6 +141,11 @@ login(Socket, Username, Password) ->
 %%--------------------------------------------------------------------
 handle_call(get_status, _From, #state{tl1_table = Tl1Table, conn_num = ConnNum, conn_state = connected} = State) ->
     {reply, {ok, [{count, ets:info(Tl1Table, size) + ConnNum}, State]}, State};
+
+handle_call(reconnect, _From, #state{host = Host, port = Port, username = Username, password = Password} = State) ->
+    ?INFO("reconnect :~p", [State]),
+    {ok, Socket, ConnState} = connect(Host, Port, Username, Password),
+    {reply, ConnState, State#state{socket = Socket, conn_num = 0, conn_state = ConnState}};
 
 handle_call(stop, _From, State) ->
     ?INFO("received stop request", []),
@@ -215,8 +224,9 @@ handle_info({tcp, Sock, Bytes}, #state{socket = Sock, rest = Rest, data = Data, 
        end,
     {noreply, State#state{rest = NewRest, data = NewData, conn_num = NewConnNum}};
 
-handle_info({tcp_closed, Socket}, State) ->
+handle_info({tcp_closed, Socket}, #state{server = Server} = State) ->
     ?ERROR("tcp close: ~p, ~p", [Socket, State]),
+    Server ! {tl1_tcp_closed, self()},
     {noreply, State#state{socket = null, conn_state = disconnect}};
 
 
