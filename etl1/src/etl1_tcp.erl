@@ -155,7 +155,7 @@ handle_call(Req, _From, State) ->
 handle_cast({login_state, LoginState}, State) ->
     ?INFO("login state ...~p, ~p", [LoginState, self()]),
     case LoginState of
-        succ -> clean_tl1_table();
+        succ -> clean_tl1_table(State);
         fail -> ok
     end,
     {noreply, State#state{login_state = LoginState}};
@@ -274,6 +274,7 @@ retry_connect() ->
     erlang:send_after(30000, self(), {timeout, retry_connect}).
 
 clean_tl1_table(#state{tl1_table = Tl1Table} = State) ->
+    ?INFO("begin to clean tl1table:~p", ets:info(Tl1Table, size)),
     clean_tl1_table(ets:first(Tl1Table), State).
 
 clean_tl1_table('$end_of_table', _State) ->
