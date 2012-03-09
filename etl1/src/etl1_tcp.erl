@@ -103,7 +103,7 @@ connect(Host, Port, Username, Password) when is_binary(Host) ->
 connect(Host, Port, Username, Password) ->
     case gen_tcp:connect(Host, Port, ?TCP_OPTIONS, ?TIMEOUT) of
     {ok, Socket} ->
-        log("connect succ...~p,~p",[Host, Port]),
+        ?INFO("connect succ...~p,~p,~p",[Socket, Host, Port]),
         login(Socket, Username, Password),
         {ok, Socket, connected};
     {error, Reason} ->
@@ -117,7 +117,7 @@ login(Socket, Username, Password) when is_binary(Username)->
 login(Socket, Username, Password) when is_binary(Password)->
     login(Socket, Username, binary_to_list(Password));
 login(Socket, Username, Password) ->
-    log("begin to login,~p,~p,~p", [Socket, Username, Password]),
+    ?INFO("begin to login,~p,~p,~p", [Socket, Username, Password]),
     Cmd = lists:concat(["LOGIN:::login::", "UN=", to_list(Username), ",PWD=", Password, ";"]),
     tcp_send(Socket, Cmd).
 
@@ -134,7 +134,7 @@ handle_call(get_status, _From, #state{tl1_table = Tl1Table, conn_num = ConnNum, 
     {reply, {ok, [{count, ets:info(Tl1Table, size) + ConnNum}, State]}, State};
 
 handle_call(stop, _From, State) ->
-    log("received stop request", []),
+    ?INFO("received stop request", []),
     {stop, normal, State};
 
 handle_call(Req, _From, State) ->
@@ -148,7 +148,6 @@ handle_call(Req, _From, State) ->
 %%          {stop, Reason, State}            (terminate/2 is called)
 %%--------------------------------------------------------------------
 handle_cast({send, Cmd}, #state{conn_state = connected, socket = Sock} = State) ->
-    log("send cmd: ~p", [Cmd]),
     tcp_send(Sock, Cmd),
     {noreply, State};
 
@@ -170,7 +169,7 @@ handle_cast({send_req, Pct, _Cmd}, #state{server = Server, conn_state = ConnStat
     {noreply, State};
 
 handle_cast({login_state, LoginState}, State) ->
-    log("login state ...~p, ~p", [LoginState, self()]),
+    ?INFO("login state ...~p, ~p", [LoginState, self()]),
     {noreply, State#state{login_state = LoginState}};
 
 handle_cast(Msg, State) ->
@@ -184,7 +183,7 @@ handle_cast(Msg, State) ->
 %%          {stop, Reason, State}            (terminate/2 is called)
 %%--------------------------------------------------------------------
 handle_info({tcp, Sock, Bytes}, #state{socket = Sock, rest = Rest, data = Data, conn_num = ConnNum} = State) ->
-%    log("received tcp ~p ", [Bytes]),
+%    ?INFO("received tcp ~p ", [Bytes]),
     {NewData, NewRest, NewConnNum} = case binary:last(Bytes) of
         $; ->
             NowBytes = binary:split(list_to_binary([Rest, Bytes]), <<">">>, [global]),
@@ -293,6 +292,7 @@ handle_send_tcp(Pct, MsgData, #state{server = Server, conn_num = ConnNum, socket
     end.
 
 tcp_send(Sock, Msg) ->
+    ?INFO("send cmd: ~p", [Msg]),
     case (catch gen_tcp:send(Sock, Msg)) of
 	ok ->
 	    succ;
@@ -304,7 +304,7 @@ tcp_send(Sock, Msg) ->
 tcp_send(Server, Pct, Sock, Msg) ->
     case (catch gen_tcp:send(Sock, Msg)) of
 	ok ->
-	    log("send cmd  to :~p", [Msg]),
+	    ?INFO("send cmd  to :~p", [Msg]),
 	    succ;
 	{error, Reason} ->
 	    ?ERROR("failed sending message to ~p",[Reason]),
@@ -376,6 +376,3 @@ handle_recv_msg(Bytes, #state{server = Server, data = Data, socket = Socket,
             ?ERROR("processing of received message failed: ~n ~p", [Error]),
             ok
     end.
-
-log(Format, Args) ->
-    ?INFO(Format, Args).
