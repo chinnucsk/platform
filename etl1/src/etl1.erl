@@ -74,7 +74,7 @@ input(Type, Cmd, Timeout) when is_tuple(Type)->
             Data;
         {error, Reason} ->
             %send before: {error, {invalid_request, Req}} | {error, no_ctag} | {error, {no_type, Type}}
-            %             {error, {'EXIT',Reason }} | {error, {conn_failed, ConnState, Host, Port}}
+            %             {error, {'EXIT',Reason }} | {error, {conn_failed, Info}}
             %sending    : {error, {tcp_send_error, Reason}} | {error, {tcp_send_exception, Error}}
             %send after : {error, {tl1_timeout, Data}}
             {error, Reason};
@@ -143,6 +143,7 @@ do_connect(Tl1Info) ->
     CityId = proplists:get_value(cityid, Tl1Info, <<"">>),
     case  do_connect2(Tl1Info) of
         {ok, Pid} ->
+            etl1_tcp:shakehand(Pid),
             {{to_list(Type), to_list(CityId)}, Pid};
         {error, Error} ->
             ?ERROR("get tcp error: ~p, ~p", [Error, Tl1Info]),
@@ -245,10 +246,6 @@ handle_info({tl1_error, Pct, Reason}, State) ->
     handle_tl1_error(Pct, Reason, State),
     {noreply, State};
 
-handle_info({tl1_login, Tcp, {login_state, _LoginState}}, State) ->
-    etl1_tcp:shakehand(Tcp),
-    {noreply, State};
-    
 handle_info({tl1_tcp, _Tcp, Pct}, State) ->
     handle_recv_tcp(Pct, State),
     {noreply, State};
@@ -286,11 +283,6 @@ code_change(_Vsn, State, _Extra) ->
 handle_sync_input(Pid, Cmd, Timeout, From, #state{req_id = ReqId} = State) ->
     NextReqId = get_next_reqid(ReqId),
     ?INFO("input reqid:~p, cmd:~p, state:~p",[NextReqId, Cmd, State]),
-    Session = #pct{request_id = NextReqId,
-               type = 'input',
-               complete_code = 'REQ',
-               data = Cmd},
-    etl1_tcp:send_req(Pid, Session, Cmd),
     Msg    = {sync_timeout, NextReqId, From},
     Ref    = erlang:send_after(Timeout, self(), Msg),
     Req    = #request{id = NextReqId,
@@ -300,43 +292,55 @@ handle_sync_input(Pid, Cmd, Timeout, From, #state{req_id = ReqId} = State) ->
               time    = extbif:timestamp(),
               timeout = Timeout,
               from    = From},
+    send_req(Pid, Req, Cmd, State),
     ets:insert(tl1_request_table, Req),
     {ok, State#state{req_id = NextReqId}}.
 
 handle_asyn_input(Pid, Cmd, Ems, #state{req_id = ReqId} = State) ->
     NextReqId = get_next_reqid(ReqId),
     ?INFO("input reqid:~p, cmd:~p, state:~p",[NextReqId, Cmd, State]),
-    Session = #pct{request_id = NextReqId,
-               type = 'asyn_input',
-               complete_code = 'REQ',
-               data = Cmd},
-    etl1_tcp:send_req(Pid, Session, Cmd),
     Req    = #request{id = NextReqId,
               type    = 'asyn_input',
               ems     = Ems,
               data    = Cmd,
               time    = extbif:timestamp()},
+    send_req(Pid, Req, Cmd, State),
     ets:insert(tl1_request_table, Req),
     {noreply, State#state{req_id = NextReqId}}.
 
 
-%% send error
-handle_tl1_error(#pct{request_id = ReqId} = Pct, Reason, #state{callback = Callback} = _State) ->
-    case ets:lookup(tl1_request_table, ReqId) of
-	[#request{type = 'input', ref = _Ref, from = From}] ->
-	    gen_server:reply(From, {error, Reason}),
-	    ets:delete(tl1_request_table, ReqId),
-	    ok;
-	[#request{type = 'asyn_input',data = Cmd, time = Time}] ->
-        Now = extbif:timestamp(),
-        ?INFO("recv tcp reqid:~p, time:~p, cmd :~p",[ReqId, Now - Time, Cmd]),
-        lists:map(fun({_Name, Pid}) ->
-            Pid ! {asyn_data, {error, Reason}}
-        end, Callback);
-	_ ->
-		?ERROR("unexpected tl1, reqid:~p, ~n error: ~p",[Pct, Reason])
+send_req(Pid, Req, Cmd, State) ->
+    try etl1_mpd:generate_msg(Req#request.id, Cmd) of
+        {ok, NewCmd} ->
+            etl1_tcp:send_tcp(Pid, {Req#request.id, NewCmd});
+        {discarded, Reason} ->
+            Pct = #pct{request_id = Req#request.id},
+            handle_tl1_error(Pct, Reason, State)
+         catch
+            Error:Exception ->
+            ?ERROR("exception: ~p, ~n ~p", [{Error, Exception}, erlang:get_stacktrace()]),
+            Pct = #pct{request_id = Req#request.id},
+            handle_tl1_error(Pct, {'EXIT',Exception}, State)
     end.
 
+%% send error
+handle_tl1_error(#pct{request_id = ReqId} = Pct, Reason, #state{callback = Callback} = _State) ->
+    case ets:lookup(tl1_request_table, to_integer(ReqId)) of
+        [#request{type = 'input', ref = _Ref, from = From}] ->
+            gen_server:reply(From, {error, Reason}),
+            ets:delete(tl1_request_table, ReqId),
+            ok;
+        [#request{type = 'asyn_input',data = Cmd, time = Time}] ->
+            Now = extbif:timestamp(),
+            ?INFO("recv tcp reqid:~p, time:~p, cmd :~p",[ReqId, Now - Time, Cmd]),
+            lists:map(fun({_Name, Pid}) ->
+                Pid ! {asyn_data, {error, Reason}}
+            end, Callback);
+        _ ->
+            ?ERROR("unexpected tl1, reqid:~p, ~n error: ~p",[Pct, Reason])
+    end;
+handle_tl1_error(Tcp, Reason, _State) ->
+    ?ERROR("tl1 error: ~p, ~p",[Tcp, Reason]).
 
 %% receive
 handle_recv_tcp(#pct{request_id = ReqId, type = 'output', complete_code = CompCode, data = Data} = _Pct,  

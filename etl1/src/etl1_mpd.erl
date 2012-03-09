@@ -195,9 +195,9 @@ to_tuple_record([F|FT], [V|VT], Acc) ->
 %%-----------------------------------------------------------------
 %% Generate a message
 %%-----------------------------------------------------------------
-generate_msg(Pct, MsgData) ->
-    Cmd = to_list(MsgData),
-    case re:replace(Cmd, "CTAG", to_list(Pct#pct.request_id), [global,{return, list}]) of
+generate_msg(ReqId, CmdInit) ->
+    Cmd = to_list(CmdInit),
+    case re:replace(Cmd, "CTAG", to_list(ReqId), [global,{return, list}]) of
         Cmd -> {discarded, no_ctag};
         NewString -> {ok, NewString}
     end.

@@ -1,4 +1,4 @@
--record(pct, {request_id, type, complete_code, en, data}).
+-record(pct, {id, request_id, type, complete_code, en, data}).
 
        
 
