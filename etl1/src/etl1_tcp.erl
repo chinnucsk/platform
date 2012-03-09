@@ -140,7 +140,7 @@ login(Socket, Username, Password) ->
 %%          {stop, Reason, State}            (terminate/2 is called)
 %%--------------------------------------------------------------------
 handle_call(get_status, _From, #state{tl1_table = Tl1Table, conn_num = ConnNum, conn_state = connected} = State) ->
-    {reply, {ok, [{count, ets:info(Tl1Table, size) + ConnNum}, State]}, State};
+    {reply, {ok, [{count, ets:info(Tl1Table, size), ConnNum}, State]}, State};
 
 handle_call(reconnect, _From, #state{host = Host, port = Port, username = Username, password = Password} = State) ->
     ?INFO("reconnect :~p", [State]),
@@ -176,8 +176,8 @@ handle_cast(_, #state{server = Server, conn_state = disconnect} = State) ->
 handle_cast({send, Pct}, #state{count = Count, tl1_table = Tl1Table, login_state = undefined} = State) ->
     NewId = get_next_id(Count),
     NewPct = Pct#pct{id = NewId},
-    ?INFO("hold on, need login first : ~p", [NewPct]),
     ets:insert(Tl1Table, NewPct),
+    ?INFO("hold on, need login first : ~p", [NewPct]),
     {noreply, State#state{count = NewId}};
 
 handle_cast(_, #state{server = Server, login_state = fail} = State) ->
@@ -300,11 +300,14 @@ clean_tl1_table(Reqid, #state{tl1_table = Tl1Table, server = Server, socket = So
     clean_tl1_table(ets:next(Tl1Table, Reqid), State).
 
 
+check_tl1_table(ConnNum, #state{login_state = undefined} = _State) ->
+    ConnNum;
 check_tl1_table(ConnNum, #state{tl1_table = Tl1Table} = State) ->
     check_tl1_table(ets:first(Tl1Table), ConnNum, State).
 
+
 check_tl1_table('$end_of_table', ConnNum, _State) ->
-    ConnNum - 1;
+     ConnNum - 1;
 check_tl1_table(Reqid, ConnNum, #state{tl1_table = Tl1Table} = State) ->
     case ets:lookup(Tl1Table, Reqid) of
         [Pct] ->

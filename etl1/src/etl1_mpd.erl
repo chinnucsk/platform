@@ -17,12 +17,12 @@
 %   ZTE_192.168.41.10 2011-07-19 16:45:35
 %   M  CTAG DENY
 process_msg(MsgData) when is_binary(MsgData) ->
-%    ?INFO("get respond :~p", [MsgData]),
+    ?INFO("get respond :~p", [MsgData]),
     Lines = string:tokens(to_list(MsgData), "\r\n"),
     process_msg(Lines);
 
 process_msg(Lines) ->
-%    ?INFO("get respond splite :~p", [Lines]),
+    ?INFO("get respond splite :~p", [Lines]),
     _Header = lists:nth(1, Lines),
     RespondId = lists:nth(2, Lines),
     {ReqLevel, ReqId, CompletionCode} = get_response_id(RespondId),
@@ -69,7 +69,7 @@ get_response_id(RespondId) ->
     {ReqLevel, ReqId, CompletionCode}.
 
 get_trap_body(TrapLevel, TrapBody) ->
-    Datas = get_rows(TrapBody),
+    {ok, Datas} = get_rows(TrapBody),
     lists:map(fun(Data) ->
           Rest =  lists:map(fun(Item) ->
               case string:tokens(Item, "=") of
