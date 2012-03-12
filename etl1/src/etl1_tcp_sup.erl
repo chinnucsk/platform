@@ -4,14 +4,17 @@
 
 -behaviour(supervisor).
 
--export([start_link/0, start_child/1]).
+-export([start_link/0, start_link/1, start_child/1]).
 -export([init/1]).
 
 start_link() ->
     supervisor:start_link({local, etl1_tcp_sup}, ?MODULE, []).
 
-start_child(Params) ->
-    supervisor:start_child(etl1_tcp_sup, Params).
+start_link(Name) ->
+    supervisor:start_link({local, Name}, ?MODULE, []).
+
+start_child(Sup, Params) ->
+    supervisor:start_child(Sup, Params).
 
 init([]) ->
     {ok, {{simple_one_for_one, 0, 1},
