@@ -19,6 +19,6 @@ init([Opts]) ->
     Tl1Options = proplists:get_value(ems, Opts),
     Etl1 = {etl1, {etl1, start_link, [Tl1Options]},
         permanent, 10, worker, [etl1]},
-    Etl1TcpSub = {etl1_tcp_sup, {etl1_tcp_sup, start_link, [Tl1Options]},
+    Etl1TcpSub = {etl1_tcp_sup, {etl1_tcp_sup, start_link, []},
         temporary, infinity , supervisor, [etl1_tcp_sup]},
 	{ok, {{one_for_all, 10, 100}, [Etl1Agent, Etl1, Etl1TcpSub]}}.
