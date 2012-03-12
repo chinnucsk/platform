@@ -17,12 +17,12 @@
 %   ZTE_192.168.41.10 2011-07-19 16:45:35
 %   M  CTAG DENY
 process_msg(MsgData) when is_binary(MsgData) ->
-    log("get respond :~p", [MsgData]),
+    ?INFO("get respond :~p", [MsgData]),
     Lines = string:tokens(to_list(MsgData), "\r\n"),
     process_msg(Lines);
 
 process_msg(Lines) ->
-    log("get respond splite :~p", [Lines]),
+    ?INFO("get respond splite :~p", [Lines]),
     _Header = lists:nth(1, Lines),
     RespondId = lists:nth(2, Lines),
     {ReqLevel, ReqId, CompletionCode} = get_response_id(RespondId),
@@ -31,7 +31,7 @@ process_msg(Lines) ->
 
  process_msg({"ALARM", ReqId, TrapLevel}, RespondBlock) ->
     TrapData = get_trap_body(TrapLevel, RespondBlock),
-    log("get trap data ~p", [TrapData]),
+    ?INFO("get trap data ~p", [TrapData]),
     Pct = #pct{request_id = ReqId,
                type = 'alarm',
                data =  {ok, TrapData}
@@ -50,7 +50,7 @@ process_msg(Lines) ->
             {error, {tl1_cmd_error, [{en, En}, {endesc, Endesc}, {reason, Reason}]}}
      end,
     Terminator = lists:last(RespondBlock),
-    log("reqid:~p,comp_code: ~p, terminator: ~p, data:~p",[ReqId, CompletionCode, Terminator, RespondData]),
+%    ?INFO("reqid:~p,comp_code: ~p, terminator: ~p, data:~p",[ReqId, CompletionCode, Terminator, RespondData]),
     Pct = #pct{request_id = ReqId,
                type = 'output',
                complete_code = CompletionCode,
@@ -69,7 +69,7 @@ get_response_id(RespondId) ->
     {ReqLevel, ReqId, CompletionCode}.
 
 get_trap_body(TrapLevel, TrapBody) ->
-    Datas = get_rows(TrapBody),
+    {ok, Datas} = get_rows(TrapBody),
     lists:map(fun(Data) ->
           Rest =  lists:map(fun(Item) ->
               case string:tokens(Item, "=") of
@@ -109,7 +109,7 @@ get_response_data(Block) ->
     {PackageRecordsNo, Block2} = get_response_data("block_records=", Block1),
     {Title, Block3} = get_response_data("list |List |LST ", Block2),
     {_SpliteLine, Block4} = get_response_data("---", Block3),
-    log("get response:~p", [{TotalPackageNo, CurrPackageNo, PackageRecordsNo, Title}]),
+%    ?INFO("get response:~p", [{TotalPackageNo, CurrPackageNo, PackageRecordsNo, Title}]),
     case get_response_data(fields, Block4) of
 			{fields, []} ->
                 no_data;
@@ -195,13 +195,9 @@ to_tuple_record([F|FT], [V|VT], Acc) ->
 %%-----------------------------------------------------------------
 %% Generate a message
 %%-----------------------------------------------------------------
-generate_msg(Pct, MsgData) ->
-    Cmd = to_list(MsgData),
-    case re:replace(Cmd, "CTAG", to_list(Pct#pct.request_id), [global,{return, list}]) of
+generate_msg(ReqId, CmdInit) ->
+    Cmd = to_list(CmdInit),
+    case re:replace(Cmd, "CTAG", to_list(ReqId), [global,{return, list}]) of
         Cmd -> {discarded, no_ctag};
         NewString -> {ok, NewString}
     end.
-
-log(Format, Args) ->
-%    ok.
-    ?INFO(Format, Args).

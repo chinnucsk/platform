@@ -8,9 +8,8 @@
 -export([start_link/2, start_link/3,
         get_status/1,
         shakehand/1,
-        send_req/3,
         send_tcp/2,
-        log/2]).
+        reconnect/1]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -32,9 +31,9 @@
 -define(MAX_CONN, 100).
 
 -record(state, {server, host, port, username, password, max_conn,
-        socket, tl1_table, conn_num, conn_state, login_state, rest, data}).
+        socket, count, tl1_table, conn_num, conn_state, login_state, rest, data}).
 
--include("tl1.hrl").
+-record(pct, {id, request_id, type, complete_code, en, data}).
 
 -import(dataset, [get_value/2, get_value/3]).
 
@@ -60,11 +59,21 @@ get_status(Pid) ->
 shakehand(Pid) ->
     Pid ! shakehand.
 
-send_req(Pid, Session, Cmd) ->
-    gen_server2:cast(Pid, {send_req, Session, Cmd}).
-
+send_tcp(Pid, {ReqId, Cmd}) ->
+    Pct = #pct{request_id = ReqId,
+                type = 'req',
+                data = Cmd
+            },
+    gen_server2:cast(Pid, {send, Pct});
 send_tcp(Pid, Cmd) ->
-    gen_server2:cast(Pid, {send, Cmd}).
+    Pct = #pct{type = 'req',
+                data = Cmd
+            },
+    gen_server2:cast(Pid, {send, Pct}).
+
+reconnect(Pid) ->
+    gen_server2:call(Pid, reconnect).
+
 
 %%%-------------------------------------------------------------------
 %%% Callback functions from gen_server
@@ -86,8 +95,7 @@ init([Server, Args]) ->
     end.
 
 do_init(Server, Args) ->
-    process_flag(trap_exit, true),
-    Tl1Table = ets:new(tl1_table, [ordered_set, {keypos, #pct.request_id}]),
+    Tl1Table = ets:new(tl1_table, [ordered_set, {keypos, #pct.id}]),
     %% -- Socket --
     Host = proplists:get_value(host, Args),
     Port = proplists:get_value(port, Args),
@@ -97,14 +105,14 @@ do_init(Server, Args) ->
     {ok, Socket, ConnState} = connect(Host, Port, Username, Password),
     %%-- We are done ---
     {ok, #state{server = Server, host = Host, port = Port, username = Username, password = Password, max_conn = MaxConn, 
-        socket = Socket, tl1_table = Tl1Table, conn_num = 0, conn_state = ConnState, rest = <<>>, data = []}}.
+        socket = Socket, count = 0, tl1_table = Tl1Table, conn_num = 0, conn_state = ConnState, rest = <<>>, data = []}}.
 
 connect(Host, Port, Username, Password) when is_binary(Host) ->
     connect(binary_to_list(Host), Port, Username, Password);
 connect(Host, Port, Username, Password) ->
     case gen_tcp:connect(Host, Port, ?TCP_OPTIONS, ?TIMEOUT) of
     {ok, Socket} ->
-        log("connect succ...~p,~p",[Host, Port]),
+        ?INFO("connect succ...~p,~p,~p",[Socket, Host, Port]),
         login(Socket, Username, Password),
         {ok, Socket, connected};
     {error, Reason} ->
@@ -118,7 +126,7 @@ login(Socket, Username, Password) when is_binary(Username)->
 login(Socket, Username, Password) when is_binary(Password)->
     login(Socket, Username, binary_to_list(Password));
 login(Socket, Username, Password) ->
-    log("begin to login,~p,~p,~p", [Socket, Username, Password]),
+    ?INFO("begin to login,~p,~p,~p", [Socket, Username, Password]),
     Cmd = lists:concat(["LOGIN:::login::", "UN=", to_list(Username), ",PWD=", Password, ";"]),
     tcp_send(Socket, Cmd).
 
@@ -132,10 +140,15 @@ login(Socket, Username, Password) ->
 %%          {stop, Reason, State}            (terminate/2 is called)
 %%--------------------------------------------------------------------
 handle_call(get_status, _From, #state{tl1_table = Tl1Table, conn_num = ConnNum, conn_state = connected} = State) ->
-    {reply, {ok, [{count, ets:info(Tl1Table, size) + ConnNum}, State]}, State};
+    {reply, {ok, [{count, ets:info(Tl1Table, size), ConnNum}, State]}, State};
+
+handle_call(reconnect, _From, #state{host = Host, port = Port, username = Username, password = Password} = State) ->
+    ?INFO("reconnect :~p", [State]),
+    {ok, Socket, ConnState} = connect(Host, Port, Username, Password),
+    {reply, ConnState, State#state{socket = Socket, conn_num = 0, conn_state = ConnState}};
 
 handle_call(stop, _From, State) ->
-    log("received stop request", []),
+    ?INFO("received stop request", []),
     {stop, normal, State};
 
 handle_call(Req, _From, State) ->
@@ -148,30 +161,40 @@ handle_call(Req, _From, State) ->
 %%          {noreply, State, Timeout} |
 %%          {stop, Reason, State}            (terminate/2 is called)
 %%--------------------------------------------------------------------
-handle_cast({send, Cmd}, #state{conn_state = connected, socket = Sock} = State) ->
-    tcp_send(Sock, Cmd),
-    {noreply, State};
-
-handle_cast({send, _Cmd}, #state{server = Server, conn_state = ConnState, host = Host, port = Port} = State) ->
-    Server ! {tl1_error, self(), {conn_failed, ConnState, Host, Port}},
-    {noreply, State};
-
-handle_cast({send_req, Pct, _Cmd}, #state{tl1_table = Tl1Table,conn_num = ConnNum,
-    conn_state = connected} = State) when ConnNum > ?MAX_CONN ->
-    ets:insert(Tl1Table, Pct),
-    {noreply, State};
-
-handle_cast({send_req, Pct, Cmd}, #state{conn_state = connected} = State) ->
-    NewConnNum = handle_send_tcp(Pct, Cmd, State),
-    {noreply, State#state{conn_num = NewConnNum}};
-
-handle_cast({send_req, Pct, _Cmd}, #state{server = Server, conn_state = ConnState, host = Host, port = Port} = State) ->
-    Server ! {tl1_error, Pct, {conn_failed, ConnState, Host, Port}},
-    {noreply, State};
-
 handle_cast({login_state, LoginState}, State) ->
-    log("login state ...~p, ~p", [LoginState, self()]),
+    ?INFO("login state ...~p, ~p", [LoginState, self()]),
+    case LoginState of
+        succ -> clean_tl1_table(State);
+        fail -> ok
+    end,
     {noreply, State#state{login_state = LoginState}};
+
+handle_cast(_, #state{server = Server, conn_state = disconnect} = State) ->
+    Server ! {tl1_error, self(), {conn_failed, State}},
+    {noreply, State};
+
+handle_cast({send, Pct}, #state{count = Count, tl1_table = Tl1Table, login_state = undefined} = State) ->
+    NewId = get_next_id(Count),
+    NewPct = Pct#pct{id = NewId},
+    ets:insert(Tl1Table, NewPct),
+    ?INFO("hold on, need login first : ~p", [NewPct]),
+    {noreply, State#state{count = NewId}};
+
+handle_cast(_, #state{server = Server, login_state = fail} = State) ->
+    Server ! {tl1_error, self(), {login_failed, State}},
+    {noreply, State};
+
+handle_cast({send, Pct}, #state{count = Count, tl1_table = Tl1Table,conn_num = ConnNum} = State) when ConnNum > ?MAX_CONN ->
+    NewId = get_next_id(Count),
+    NewPct = Pct#pct{id = NewId},
+    ets:insert(Tl1Table, NewPct),
+    {noreply, State#state{count = NewId}};
+
+handle_cast({send, Pct}, #state{count = Count} = State) ->
+    NewId = get_next_id(Count),
+    NewPct = Pct#pct{id = NewId},
+    NewConnNum = handle_send_tcp(NewPct, State),
+    {noreply, State#state{count = NewId, conn_num = NewConnNum}};
 
 handle_cast(Msg, State) ->
     ?WARNING("unexpected message: ~n~p", [Msg]),
@@ -184,7 +207,7 @@ handle_cast(Msg, State) ->
 %%          {stop, Reason, State}            (terminate/2 is called)
 %%--------------------------------------------------------------------
 handle_info({tcp, Sock, Bytes}, #state{socket = Sock, rest = Rest, data = Data, conn_num = ConnNum} = State) ->
-    log("received tcp ~p ", [Bytes]),
+%    ?INFO("received tcp ~p ", [Bytes]),
     {NewData, NewRest, NewConnNum} = case binary:last(Bytes) of
         $; ->
             NowBytes = binary:split(list_to_binary([Rest, Bytes]), <<">">>, [global]),
@@ -201,8 +224,9 @@ handle_info({tcp, Sock, Bytes}, #state{socket = Sock, rest = Rest, data = Data, 
        end,
     {noreply, State#state{rest = NewRest, data = NewData, conn_num = NewConnNum}};
 
-handle_info({tcp_closed, Socket}, State) ->
+handle_info({tcp_closed, Socket}, #state{server = Server} = State) ->
     ?ERROR("tcp close: ~p, ~p", [Socket, State]),
+    Server ! {tl1_tcp_closed, self()},
     {noreply, State#state{socket = null, conn_state = disconnect}};
 
 
@@ -259,41 +283,52 @@ code_change(_Vsn, State, _Extra) ->
 retry_connect() ->
     erlang:send_after(30000, self(), {timeout, retry_connect}).
 
+clean_tl1_table(#state{tl1_table = Tl1Table} = State) ->
+    ?INFO("begin to clean tl1table:~p", [{ets:info(Tl1Table, size), ets:first(Tl1Table)}]),
+    clean_tl1_table(ets:first(Tl1Table), State).
+
+clean_tl1_table('$end_of_table', _State) ->
+    ok;
+clean_tl1_table(Reqid, #state{tl1_table = Tl1Table, server = Server, socket = Sock} = State) ->
+    case ets:lookup(Tl1Table, Reqid) of
+        [Pct] ->
+            tcp_send(Server, Sock, Pct),
+            ets:delete(Tl1Table, Reqid);
+        [] ->
+            ok
+     end,
+    clean_tl1_table(ets:next(Tl1Table, Reqid), State).
+
+
+check_tl1_table(ConnNum, #state{login_state = undefined} = _State) ->
+    ConnNum;
 check_tl1_table(ConnNum, #state{tl1_table = Tl1Table} = State) ->
     check_tl1_table(ets:first(Tl1Table), ConnNum, State).
 
+
 check_tl1_table('$end_of_table', ConnNum, _State) ->
-    ConnNum - 1;
+     ConnNum - 1;
 check_tl1_table(Reqid, ConnNum, #state{tl1_table = Tl1Table} = State) ->
     case ets:lookup(Tl1Table, Reqid) of
         [Pct] ->
-            handle_send_tcp(Pct, Pct#pct.data, State),
+            handle_send_tcp(Pct, State),
             ets:delete(Tl1Table, Reqid);
         [] ->
             ok
      end,
      ConnNum.
 
+
 %% send
-handle_send_tcp(Pct, MsgData, #state{server = Server, conn_num = ConnNum, socket = Sock}) ->
-   try etl1_mpd:generate_msg(Pct, MsgData) of
-	{ok, Msg} ->
-	    case tcp_send(Server, Pct, Sock, Msg) of
+handle_send_tcp(Pct, #state{server = Server, conn_num = ConnNum, socket = Sock}) ->
+    case tcp_send(Server, Sock, Pct) of
             succ -> ConnNum + 1;
             fail -> ConnNum
-        end;
-	{discarded, Reason} ->
-        send_failed(Server, Pct, Reason),
-        ConnNum
-     catch
-        Error:Exception ->
-        ?ERROR("exception: ~p, ~n ~p", [{Error, Exception}, erlang:get_stacktrace()]),
-        send_failed(Server, Pct, {'EXIT',Exception}),
-        ConnNum
     end.
 
-tcp_send(Sock, Msg) ->
-    case (catch gen_tcp:send(Sock, Msg)) of
+tcp_send(Sock, Cmd) ->
+    ?INFO("send cmd: ~p", [Cmd]),
+    case (catch gen_tcp:send(Sock, Cmd)) of
 	ok ->
 	    succ;
 	Error ->
@@ -301,10 +336,10 @@ tcp_send(Sock, Msg) ->
         fail
     end.
 
-tcp_send(Server, Pct, Sock, Msg) ->
-    case (catch gen_tcp:send(Sock, Msg)) of
+tcp_send(Server, Sock, Pct) ->
+    case (catch gen_tcp:send(Sock, Pct#pct.data)) of
 	ok ->
-	    log("send cmd  to :~p", [Msg]),
+	    ?INFO("send cmd  to :~p", [Pct#pct.data]),
 	    succ;
 	{error, Reason} ->
 	    ?ERROR("failed sending message to ~p",[Reason]),
@@ -356,11 +391,13 @@ handle_recv_msg(Bytes, #state{server = Server, data = Data, socket = Socket,
             ok;
         {ok, #pct{request_id = "login", complete_code = CompletionCode}} ->
             LoginState = case CompletionCode of
-                "COMPLD" -> succ;
-                "DENY" -> fail
+                "COMPLD" ->
+                    succ;
+                "DENY" ->
+                    fail
             end,
-            login_state(self(), LoginState),
-            Server ! {tl1_login, self(), {login_state, LoginState}};
+            login_state(self(), LoginState);
+            
         {ok, #pct{type = 'alarm', data = {ok, Data2}} = _Pct}  ->
             Server ! {tl1_trap, self(), Data ++ Data2};
         {ok, #pct{type = 'output', data = NewData} = Pct}  ->
@@ -377,6 +414,9 @@ handle_recv_msg(Bytes, #state{server = Server, data = Data, socket = Socket,
             ok
     end.
 
-log(Format, Args) ->
-%    ok.
-    ?INFO(Format, Args).
+get_next_id(Id) ->
+    if Id == 1000 * 1000 ->
+           0;
+         true ->
+            Id + 1
+        end.
