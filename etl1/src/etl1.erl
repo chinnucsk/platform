@@ -153,10 +153,11 @@ do_connect(Tl1Info) ->
 do_connect2(Tl1Info) ->
     case proplists:get_value(id, Tl1Info, false) of
         false ->
-%            supervisor:start_child({})
-            etl1_tcp:start_link(self(), Tl1Info);
+            etl1_tcp_sup:start_child([self(), Tl1Info]);
+%            etl1_tcp:start_link(self(), Tl1Info);
         Id ->
-            etl1_tcp:start_link(self(), list_to_atom("etl1_tcp_" ++ to_list(Id)), Tl1Info)
+            etl1_tcp_sup:start_child([self(), list_to_atom("etl1_tcp_" ++ to_list(Id)), Tl1Info])
+%            etl1_tcp:start_link(self(), list_to_atom("etl1_tcp_" ++ to_list(Id)), Tl1Info)
     end.
 
 %%--------------------------------------------------------------------

@@ -28,5 +28,5 @@ stop(_) ->
 
 test_start() ->
     application:start(cryto),
-    elog:init(5, "var/log/sesnmp.log"),
+    elog:init(5, "var/log/tl1.log"),
     start().
