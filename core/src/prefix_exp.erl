@@ -209,8 +209,13 @@ eval({'!=', Name, Val}, Args) ->
 
 eval({'=', Name, Val}, Args) ->
      case keysearch(Name, 1, Args) of
-     {value, {_, ArgVal}} -> ArgVal == Val;
-     false -> false
+     {value, {_, ArgVal}} -> 
+		if
+		Val == "*" -> true;
+		true -> ArgVal == Val
+		end;
+     false -> 
+		false
      end;
 
 eval({'>=', Name, Val}, Args) ->
