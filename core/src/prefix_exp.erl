@@ -174,7 +174,8 @@ valid({'<=', Name, _Val}) when is_atom(Name) ->
 valid(Exp) ->
     throw({invalid_syntax, Exp}).
 
-
+get_name(_, []) ->
+	 [];
 get_name({_, SubExps}, Args) ->
     get_name(SubExps, Args, []);
 get_name({_, Name, _Val}, Args) ->
