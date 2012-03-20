@@ -70,7 +70,7 @@ input(Type, Cmd, Timeout) when is_tuple(Type)->
             Data;
         {error, Reason} ->
             %send before: {error, {invalid_request, Req}} | {error, no_ctag} | {error, {no_type, Type}}
-            %             {error, {'EXIT',Reason }} | {error, {conn_failed, Info}}
+            %             {error, {'EXIT',Reason }} | {error, {conn_failed, Info}} |{error, {login_failed, Info}}
             %sending    : {error, {tcp_send_error, Reason}} | {error, {tcp_send_exception, Error}}
             %send after : {error, {tl1_timeout, Data}}
             {error, Reason};

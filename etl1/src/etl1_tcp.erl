@@ -169,8 +169,8 @@ handle_cast({login_state, LoginState}, State) ->
     end,
     {noreply, State#state{login_state = LoginState}};
 
-handle_cast(_, #state{server = Server, conn_state = disconnect} = State) ->
-    Server ! {tl1_error, self(), {conn_failed, State}},
+handle_cast({send, Pct}, #state{server = Server, conn_state = disconnect} = State) ->
+    send_failed(Server, Pct, {conn_failed, State}),
     {noreply, State};
 
 handle_cast({send, Pct}, #state{count = Count, tl1_table = Tl1Table, login_state = undefined} = State) ->
@@ -180,8 +180,8 @@ handle_cast({send, Pct}, #state{count = Count, tl1_table = Tl1Table, login_state
     ?WARNING("hold on, need login first : ~p", [NewPct]),
     {noreply, State#state{count = NewId}};
 
-handle_cast(_, #state{server = Server, login_state = fail} = State) ->
-    Server ! {tl1_error, self(), {login_failed, State}},
+handle_cast({send, Pct}, #state{server = Server, login_state = fail} = State) ->
+    send_failed(Server, Pct, {login_failed, State}),
     {noreply, State};
 
 handle_cast({send, Pct}, #state{count = Count, tl1_table = Tl1Table,conn_num = ConnNum} = State) when ConnNum > ?MAX_CONN ->
@@ -206,23 +206,23 @@ handle_cast(Msg, State) ->
 %%          {noreply, State, Timeout} |
 %%          {stop, Reason, State}            (terminate/2 is called)
 %%--------------------------------------------------------------------
-handle_info({tcp, Sock, Bytes}, #state{socket = Sock, rest = Rest, data = Data, conn_num = ConnNum} = State) ->
+handle_info({tcp, Sock, Bytes}, #state{socket = Sock, rest = Rest, data = Data} = State) ->
 %    ?INFO("received tcp ~p ", [Bytes]),
-    {NewData, NewRest, NewConnNum} = case binary:last(Bytes) of
+    NewState = case binary:last(Bytes) of
         $; ->
             NowBytes = binary:split(list_to_binary([Rest, Bytes]), <<">">>, [global]),
             {OtherBytes, [LastBytes]} = lists:split(length(NowBytes)-1, NowBytes),
             NowData = handle_recv_wait(OtherBytes),
-            handle_recv_msg(LastBytes, State#state{data = Data ++ NowData}),
-            {[], <<>>, check_tl1_table(ConnNum, State)};
+            NState = handle_recv_msg(LastBytes, State#state{data = Data ++ NowData}),
+            NState#state{rest = <<>>, data = []};
         $> ->
             NowBytes = binary:split(list_to_binary([Rest, Bytes]), <<">">>, [global]),
             NowData = handle_recv_wait(NowBytes),
-            {Data ++ NowData, <<>>, ConnNum};
+            State#state{rest = <<>>, data = Data ++ NowData};
         _ ->
-            {Data, list_to_binary([Rest, Bytes]), ConnNum}
+            State#state{rest = list_to_binary([Rest, Bytes]), data = Data}
        end,
-    {noreply, State#state{rest = NewRest, data = NewData, conn_num = NewConnNum}};
+    {noreply, NewState};
 
 handle_info({tcp_closed, Socket}, #state{server = Server} = State) ->
     ?ERROR("tcp close: ~p, ~p", [Socket, State]),
@@ -300,9 +300,9 @@ clean_tl1_table(Reqid, #state{tl1_table = Tl1Table, server = Server, socket = So
     clean_tl1_table(ets:next(Tl1Table, Reqid), State).
 
 
-check_tl1_table(ConnNum, #state{login_state = undefined} = _State) ->
+check_tl1_table(#state{login_state = undefined, conn_num = ConnNum} = _State) ->
     ConnNum;
-check_tl1_table(ConnNum, #state{tl1_table = Tl1Table} = State) ->
+check_tl1_table(#state{tl1_table = Tl1Table, conn_num = ConnNum} = State) ->
     check_tl1_table(ets:first(Tl1Table), ConnNum, State).
 
 
@@ -379,16 +379,17 @@ handle_recv_wait(Bytes, Data) when is_binary(Bytes)->
 	    Data
     end.
 
-handle_recv_msg(<<>>, _State)  ->
-    ok;
+handle_recv_msg(<<>>, State)  ->
+    State;
 handle_recv_msg(Bytes, #state{server = Server, data = Data, socket = Socket, 
     username = Username, password = Password} = State) ->
     case (catch etl1_mpd:process_msg(Bytes)) of
         {ok, #pct{complete_code = "DENY", en = "AAFD"}} ->
             ?WARNING("begin to relogin...~p", [State]),
-            login(Socket, Username, Password);
+            login(Socket, Username, Password),
+            State;
         {ok, #pct{request_id = "shakehand", complete_code = _CompletionCode}} ->
-            ok;
+            State;
         {ok, #pct{request_id = "login", complete_code = CompletionCode}} ->
             LoginState = case CompletionCode of
                 "COMPLD" ->
@@ -396,7 +397,8 @@ handle_recv_msg(Bytes, #state{server = Server, data = Data, socket = Socket,
                 "DENY" ->
                     fail
             end,
-            login_state(self(), LoginState);
+            login_state(self(), LoginState),
+            State;
             
         {ok, #pct{type = 'alarm', data = {ok, Data2}} = Pct}  ->
             Server ! {tl1_trap, self(), Pct#pct{data = Data ++ Data2}};
@@ -407,11 +409,11 @@ handle_recv_msg(Bytes, #state{server = Server, data = Data, socket = Socket,
                 {error, _Reason} ->
                     {error, _Reason}
             end,
-            Server ! {tl1_tcp, self(), Pct#pct{data = AccData}};
-
+            Server ! {tl1_tcp, self(), Pct#pct{data = AccData}},
+            State#state{conn_num = check_tl1_table(State)};
         Error ->
             ?ERROR("processing of received message failed: ~n ~p", [Error]),
-            ok
+            State
     end.
 
 get_next_id(Id) ->
