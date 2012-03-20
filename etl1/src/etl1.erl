@@ -31,7 +31,7 @@
 
 -record(request,  {id, type, ems, data, ref, timeout, time, from}).
 
--record(state, {tl1_tcp, tl1_tcp_sup, req_id=0, req_type, req_over=0, callback=[]}).
+-record(state, {tl1_tcp, tl1_tcp_sup, req_id=0, req_type, req_over=0, req_timeout_over=0, callback=[]}).
 
 %%%-------------------------------------------------------------------
 %%% API
@@ -50,7 +50,7 @@ get_tl1() ->
     gen_server:call(?MODULE, get_tl1, ?CALL_TIMEOUT).
 
 get_tl1_req() ->
-    [{tl1_timeout, ets:info(tl1_request_timeout, size)}, {tl1_table, ets:info(tl1_request_table, size)}].
+    gen_server:call(?MODULE, get_tl1_req, ?CALL_TIMEOUT).
 
 
 set_tl1(Tl1Info) ->
@@ -174,6 +174,12 @@ handle_call(get_tl1, _From, #state{tl1_tcp = Pids} = State) ->
     end, Pids),
     {reply, {ok, Result}, State};
 
+handle_call(get_tl1_req, _From,  #state{req_id=Id, req_over=ReqOver, req_timeout_over = ReqTimeout} = State) ->
+    Result = [{tl1_timeout, ets:info(tl1_request_timeout, size)},
+            {tl1_table, ets:info(tl1_request_table, size)},
+            {req_id, Id}, {req_over, ReqOver}, {req_timeout_over, ReqTimeout}],
+    {reply, {ok, Result}, State};
+
 handle_call({set_tl1, Tl1Info}, _From, #state{tl1_tcp = Pids, tl1_tcp_sup = TcpSup} = State) ->
     NewPid = do_connect(TcpSup, Tl1Info),
     NewState = State#state{tl1_tcp = [NewPid|Pids]},
@@ -230,7 +236,7 @@ handle_info({sync_timeout, ReqId, From}, State) ->
         [#request{from = From, data = Data} = Req] ->
             ?WARNING("received sync_timeout [~w] message: ~p", [ReqId, Req]),
             gen_server:reply(From, {error, {tl1_timeout, [ReqId, Data]}}),
-            ert(tl1_request_timeout, Req),
+            ets:insert(tl1_request_timeout, Req),
             ets:delete(tl1_request_table, ReqId);
         _ ->
             ?ERROR("cannot lookup reqid:~p", [ReqId])
@@ -341,7 +347,7 @@ handle_tl1_error(Tcp, Reason, _State) ->
 
 %% receive
 handle_recv_tcp(#pct{request_id = ReqId, type = 'output', complete_code = CompCode, data = Data} = _Pct,  
-    #state{callback = Callback, req_over = ReqOver} = State) ->
+    #state{callback = Callback, req_over = ReqOver, req_timeout_over = ReqTimeoutOver} = State) ->
 %    ?INFO("recv tcp reqid:~p, code:~p, data:~p",[ReqId, CompCode, Data]),
     case ets:lookup(tl1_request_table, to_integer(ReqId)) of
         [#request{type = 'input', ref = Ref, data = Cmd, timeout = Timeout, from = From}] ->
@@ -355,7 +361,7 @@ handle_recv_tcp(#pct{request_id = ReqId, type = 'output', complete_code = CompCo
             %TODO Terminator判断是否结束，然后回复，需要reqid是否一致，下一个包是否有head，目的多次信息收集，一次返回
             gen_server:reply(From, Reply),
             ets:delete(tl1_request_table, to_integer(ReqId)),
-            State#state.req_over = ReqOver + 1;
+            State#state{req_over = ReqOver + 1};
        [#request{type = 'asyn_input',ems = {Type, Cityid}, data = Cmd, time = Time}] ->
            Now = extbif:timestamp(),
            ?INFO("recv tcp reqid:~p, ems:~p, time:~p, cmd :~p",[ReqId, {Type, Cityid}, Now - Time, Cmd]),
@@ -369,11 +375,12 @@ handle_recv_tcp(#pct{request_id = ReqId, type = 'output', complete_code = CompCo
             [#request{data = Cmd, time = Time}] ->
                 Now = extbif:timestamp(),
                 ?ERROR("cannot find reqid:~p, time:~p, cmd:~p", [ReqId, Now - Time, Cmd]),
-                ets:delete(tl1_request_timeout, to_integer(ReqId));
+                ets:delete(tl1_request_timeout, to_integer(ReqId)),
+                State#state{req_over = ReqTimeoutOver + 1};
              _ ->
-                ?ERROR("cannot find reqid2:~p", [ReqId])
-        end,
-        State
+                ?ERROR("cannot find reqid2:~p", [ReqId]),
+                State
+        end
 	end;
 handle_recv_tcp(Pct, State) ->
     ?ERROR("received crap  pct :~p", [Pct]),
