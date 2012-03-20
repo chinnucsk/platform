@@ -17,7 +17,7 @@
 %   ZTE_192.168.41.10 2011-07-19 16:45:35
 %   M  CTAG DENY
 process_msg(MsgData) when is_binary(MsgData) ->
-    ?INFO("get respond :~p", [MsgData]),
+%    ?INFO("get respond :~p", [MsgData]),
     Lines = string:tokens(to_list(MsgData), "\r\n"),
     process_msg(Lines);
 
@@ -49,7 +49,7 @@ process_msg(Lines) ->
         {error, Reason} ->
             {error, {tl1_cmd_error, [{en, En}, {endesc, Endesc}, {reason, Reason}]}}
      end,
-    Terminator = lists:last(RespondBlock),
+%    Terminator = lists:last(RespondBlock),
 %    ?INFO("reqid:~p,comp_code: ~p, terminator: ~p, data:~p",[ReqId, CompletionCode, Terminator, RespondData]),
     Pct = #pct{request_id = ReqId,
                type = 'output',

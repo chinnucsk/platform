@@ -139,7 +139,7 @@ login(Socket, Username, Password) ->
 %%          {stop, Reason, Reply, State}   | (terminate/2 is called)
 %%          {stop, Reason, State}            (terminate/2 is called)
 %%--------------------------------------------------------------------
-handle_call(get_status, _From, #state{tl1_table = Tl1Table, conn_num = ConnNum, conn_state = connected} = State) ->
+handle_call(get_status, _From, #state{tl1_table = Tl1Table, conn_num = ConnNum} = State) ->
     {reply, {ok, [{count, ets:info(Tl1Table, size), ConnNum}, State]}, State};
 
 handle_call(reconnect, _From, #state{host = Host, port = Port, username = Username, password = Password} = State) ->
@@ -152,7 +152,7 @@ handle_call(stop, _From, State) ->
     {stop, normal, State};
 
 handle_call(Req, _From, State) ->
-    ?WARNING("unexpect request: ~p", [Req]),
+    ?WARNING("unexpect request: ~p,~p", [Req, State]),
     {reply, {error, {invalid_request, Req}}, State}.
 
 %%--------------------------------------------------------------------
@@ -398,8 +398,8 @@ handle_recv_msg(Bytes, #state{server = Server, data = Data, socket = Socket,
             end,
             login_state(self(), LoginState);
             
-        {ok, #pct{type = 'alarm', data = {ok, Data2}} = _Pct}  ->
-            Server ! {tl1_trap, self(), Data ++ Data2};
+        {ok, #pct{type = 'alarm', data = {ok, Data2}} = Pct}  ->
+            Server ! {tl1_trap, self(), Pct#pct{data = Data ++ Data2}};
         {ok, #pct{type = 'output', data = NewData} = Pct}  ->
             AccData = case NewData of
                 {ok, Data2} ->
