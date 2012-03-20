@@ -112,7 +112,7 @@ connect(Host, Port, Username, Password) when is_binary(Host) ->
 connect(Host, Port, Username, Password) ->
     case gen_tcp:connect(Host, Port, ?TCP_OPTIONS, ?TIMEOUT) of
     {ok, Socket} ->
-        ?INFO("connect succ...~p,~p,~p",[Socket, Host, Port]),
+        ?WARNING("connect succ...~p,~p,~p",[Socket, Host, Port]),
         login(Socket, Username, Password),
         {ok, Socket, connected};
     {error, Reason} ->
@@ -126,7 +126,7 @@ login(Socket, Username, Password) when is_binary(Username)->
 login(Socket, Username, Password) when is_binary(Password)->
     login(Socket, Username, binary_to_list(Password));
 login(Socket, Username, Password) ->
-    ?INFO("begin to login,~p,~p,~p", [Socket, Username, Password]),
+    ?WARNING("begin to login,~p,~p,~p", [Socket, Username, Password]),
     Cmd = lists:concat(["LOGIN:::login::", "UN=", to_list(Username), ",PWD=", Password, ";"]),
     tcp_send(Socket, Cmd).
 
@@ -162,7 +162,7 @@ handle_call(Req, _From, State) ->
 %%          {stop, Reason, State}            (terminate/2 is called)
 %%--------------------------------------------------------------------
 handle_cast({login_state, LoginState}, State) ->
-    ?INFO("login state ...~p, ~p", [LoginState, self()]),
+    ?WARNING("login state ...~p, ~p", [LoginState, self()]),
     case LoginState of
         succ -> clean_tl1_table(State);
         fail -> ok
@@ -177,7 +177,7 @@ handle_cast({send, Pct}, #state{count = Count, tl1_table = Tl1Table, login_state
     NewId = get_next_id(Count),
     NewPct = Pct#pct{id = NewId},
     ets:insert(Tl1Table, NewPct),
-    ?INFO("hold on, need login first : ~p", [NewPct]),
+    ?WARNING("hold on, need login first : ~p", [NewPct]),
     {noreply, State#state{count = NewId}};
 
 handle_cast(_, #state{server = Server, login_state = fail} = State) ->
@@ -284,7 +284,7 @@ retry_connect() ->
     erlang:send_after(30000, self(), {timeout, retry_connect}).
 
 clean_tl1_table(#state{tl1_table = Tl1Table} = State) ->
-    ?INFO("begin to clean tl1table:~p", [{ets:info(Tl1Table, size), ets:first(Tl1Table)}]),
+    ?WARNING("begin to clean tl1table:~p", [{ets:info(Tl1Table, size), ets:first(Tl1Table)}]),
     clean_tl1_table(ets:first(Tl1Table), State).
 
 clean_tl1_table('$end_of_table', _State) ->
