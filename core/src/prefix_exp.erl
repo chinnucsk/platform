@@ -174,12 +174,15 @@ valid({'<=', Name, _Val}) when is_atom(Name) ->
 valid(Exp) ->
     throw({invalid_syntax, Exp}).
 
-
+get_name(_, []) ->
+	 [];
 get_name({_, SubExps}, Args) ->
     get_name(SubExps, Args, []);
 get_name({_, Name, _Val}, Args) ->
-    {value, {_, ArgVal}} = keysearch(Name, 1, Args),
-    [{Name, ArgVal}].
+    case keysearch(Name, 1, Args) of 
+	 {value, {_, ArgVal}} -> [{Name, ArgVal}];
+	  _ -> []
+     end.
     
 get_name([], _Args, Acc) ->
     lists:flatten(Acc);
@@ -209,8 +212,13 @@ eval({'!=', Name, Val}, Args) ->
 
 eval({'=', Name, Val}, Args) ->
      case keysearch(Name, 1, Args) of
-     {value, {_, ArgVal}} -> ArgVal == Val;
-     false -> false
+     {value, {_, ArgVal}} -> 
+		if
+		Val == "*" -> true;
+		true -> ArgVal == Val
+		end;
+     false -> 
+		false
      end;
 
 eval({'>=', Name, Val}, Args) ->
