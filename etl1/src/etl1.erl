@@ -228,9 +228,9 @@ handle_cast(Msg, State) ->
 handle_info({sync_timeout, ReqId, From}, State) ->
     case ets:lookup(tl1_request_table, ReqId) of
         [#request{from = From, data = Data} = Req] ->
-            ?WARNING("received sync_timeout [~w] message: ~p", [ReqId, {tl1_table, ets:info(tl1_request_table, size)}]),
+            ?WARNING("received sync_timeout [~w] message: ~p", [ReqId, Req]),
             gen_server:reply(From, {error, {tl1_timeout, [ReqId, Data]}}),
-            ets:insert(tl1_request_timeout, Req),
+            ert(tl1_request_timeout, Req),
             ets:delete(tl1_request_table, ReqId);
         _ ->
             ?ERROR("cannot lookup reqid:~p", [ReqId])
@@ -354,7 +354,7 @@ handle_recv_tcp(#pct{request_id = ReqId, type = 'output', complete_code = CompCo
             ?INFO("recv tcp reqid:~p, from:~p, cmd :~p",[{ReqId, (Timeout - Remaining)/1000}, From,Cmd]),
             %TODO Terminator判断是否结束，然后回复，需要reqid是否一致，下一个包是否有head，目的多次信息收集，一次返回
             gen_server:reply(From, Reply),
-            ets:delete(tl1_request_table, ReqId),
+            ets:delete(tl1_request_table, to_integer(ReqId)),
             State#state.req_over = ReqOver + 1;
        [#request{type = 'asyn_input',ems = {Type, Cityid}, data = Cmd, time = Time}] ->
            Now = extbif:timestamp(),
@@ -369,7 +369,7 @@ handle_recv_tcp(#pct{request_id = ReqId, type = 'output', complete_code = CompCo
             [#request{data = Cmd, time = Time}] ->
                 Now = extbif:timestamp(),
                 ?ERROR("cannot find reqid:~p, time:~p, cmd:~p", [ReqId, Now - Time, Cmd]),
-                ets:delete(tl1_request_timeout, ReqId);
+                ets:delete(tl1_request_timeout, to_integer(ReqId));
              _ ->
                 ?ERROR("cannot find reqid2:~p", [ReqId])
         end,
