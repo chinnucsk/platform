@@ -319,7 +319,7 @@ check_byte(Data, State) when is_list(Data)->
 check_byte(Byte, State) ->    
     NowByte = binary:split(Byte, <<">">>, [global]),
     {OtherByte, [LastByte]} = lists:split(length(NowByte)-1, NowByte),
-    handle_recv_msg(LastByte, handle_recv_wait(OtherByte), State);
+    handle_recv_msg(LastByte, handle_recv_wait(OtherByte), State).
 
 %% send
 handle_send_tcp(Pct, #state{server = Server, conn_num = ConnNum, socket = Sock}) ->
@@ -386,8 +386,8 @@ handle_recv_msg(<<>>, _Data, State)  ->
     State;
 handle_recv_msg(Bytes, Data, #state{server = Server, socket = Socket, username = Username, password = Password} = State) ->
     case (catch etl1_mpd:process_msg(Bytes)) of
-        {ok, #pct{complete_code = "DENY", en = "AAFD"}} ->
-            ?WARNING("begin to relogin...~p", [State]),
+        {ok, #pct{complete_code = "DENY", en = "AAFD"} = Pct} ->
+            ?WARNING("begin to relogin...~p", [State, Pct]),
             login(Socket, Username, Password),
             State;
         {ok, #pct{request_id = "shakehand", complete_code = _CompletionCode}} ->
