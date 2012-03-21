@@ -127,7 +127,12 @@ login(Socket, Username, Password) when is_binary(Password)->
     login(Socket, Username, binary_to_list(Password));
 login(Socket, Username, Password) ->
     ?WARNING("begin to login,~p,~p,~p", [Socket, Username, Password]),
-    Cmd = lists:concat(["LOGIN:::login::", "UN=", to_list(Username), ",PWD=", Password, ";"]),
+    Cmd = lists:concat(["LOGIN:::login::", "UN=", Username, ",PWD=", Password, ";"]),
+    tcp_send(Socket, Cmd).
+
+login_again(Socket, Username, Password) ->
+    ?WARNING("begin to relogin,~p,~p,~p", [Socket, Username, Password]),
+    Cmd = lists:concat(["LOGIN:::login_again::", "UN=", to_list(Username), ",PWD=", to_list(Password), ";"]),
     tcp_send(Socket, Cmd).
 
 %%--------------------------------------------------------------------
@@ -216,10 +221,10 @@ handle_info({tcp_closed, Socket}, #state{server = Server} = State) ->
     {noreply, State#state{socket = null, conn_state = disconnect}};
 
 
-handle_info(shakehand, #state{conn_num = ConnNum, socket = Socket, conn_state = connected} = State) ->
+handle_info(shakehand, #state{socket = Socket, conn_state = connected} = State) ->
     tcp_send(Socket, "SHAKEHAND:::shakehand::;"),
     erlang:send_after(5 * 60 * 1000, self(), shakehand),
-    {noreply, State#state{conn_num = ConnNum + 1}};
+    {noreply, State};
 
 handle_info(shakehand, State) ->
     {noreply, State};
@@ -308,6 +313,7 @@ check_tl1_table(Reqid, ConnNum, #state{tl1_table = Tl1Table} = State) ->
 
 check_bytes(Bytes, #state{rest = Rest} = State) ->
     NowBytes = binary:split(list_to_binary([Rest, Bytes]), <<";">>, [global]),
+    ?INFO("get bytes:~p", [NowBytes]),
     {OtherBytes, [LastBytes]} = lists:split(length(NowBytes)-1, NowBytes),
     NewState = check_byte(OtherBytes, State),
     NewState#state{rest = LastBytes}.
@@ -386,24 +392,25 @@ handle_recv_msg(<<>>, _Data, State)  ->
     State;
 handle_recv_msg(Bytes, Data, #state{server = Server, socket = Socket, username = Username, password = Password} = State) ->
     case (catch etl1_mpd:process_msg(Bytes)) of
-        {ok, #pct{complete_code = "DENY", en = "AAFD"} = Pct} ->
-            ?WARNING("begin to relogin...~p", [State, Pct]),
-            login(Socket, Username, Password),
-            State;
         {ok, #pct{request_id = "shakehand", complete_code = _CompletionCode}} ->
             State;
         {ok, #pct{request_id = "login", complete_code = CompletionCode}} ->
+            case CompletionCode of
+                "COMPLD" -> login_state(self(), succ);
+                "DENY" -> login_again(Socket, Username, Password)
+            end,
+            State;
+        {ok, #pct{request_id = "login_again", complete_code = CompletionCode}} ->
             LoginState = case CompletionCode of
-                "COMPLD" ->
-                    succ;
-                "DENY" ->
-                    fail
+                "COMPLD" -> succ;
+                "DENY" -> fail
             end,
             login_state(self(), LoginState),
             State;
             
         {ok, #pct{type = 'alarm', data = {ok, Data2}} = Pct}  ->
-            Server ! {tl1_trap, self(), Pct#pct{data = Data ++ Data2}};
+            Server ! {tl1_trap, self(), Pct#pct{data = Data ++ Data2}},
+            State;
         {ok, #pct{type = 'output', data = NewData} = Pct}  ->
             AccData = case NewData of
                 {ok, Data2} ->
