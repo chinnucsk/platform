@@ -393,7 +393,7 @@ cancel_timer(Ref) ->
     (catch erlang:cancel_timer(Ref)).
 
 get_next_reqid(ReqId) ->
-    if ReqId == 1000 * 1000 ->
+    if ReqId == 1000 * 1000 * 1000 ->
            0;
          true ->
             ReqId + 1

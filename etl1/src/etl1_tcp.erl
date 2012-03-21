@@ -31,7 +31,7 @@
 -define(MAX_CONN, 100).
 
 -record(state, {server, host, port, username, password, max_conn,
-        socket, count, tl1_table, conn_num, conn_state, login_state, rest, data}).
+        socket, count, tl1_table, conn_num, conn_state, login_state, rest}).
 
 -record(pct, {id, request_id, type, complete_code, en, data}).
 
@@ -105,7 +105,7 @@ do_init(Server, Args) ->
     {ok, Socket, ConnState} = connect(Host, Port, Username, Password),
     %%-- We are done ---
     {ok, #state{server = Server, host = Host, port = Port, username = Username, password = Password, max_conn = MaxConn, 
-        socket = Socket, count = 0, tl1_table = Tl1Table, conn_num = 0, conn_state = ConnState, rest = <<>>, data = []}}.
+        socket = Socket, count = 0, tl1_table = Tl1Table, conn_num = 0, conn_state = ConnState, rest = <<>>}}.
 
 connect(Host, Port, Username, Password) when is_binary(Host) ->
     connect(binary_to_list(Host), Port, Username, Password);
@@ -206,23 +206,9 @@ handle_cast(Msg, State) ->
 %%          {noreply, State, Timeout} |
 %%          {stop, Reason, State}            (terminate/2 is called)
 %%--------------------------------------------------------------------
-handle_info({tcp, Sock, Bytes}, #state{socket = Sock, rest = Rest, data = Data} = State) ->
+handle_info({tcp, Sock, Bytes}, #state{socket = Sock} = State) ->
 %    ?INFO("received tcp ~p ", [Bytes]),
-    NewState = case binary:last(Bytes) of
-        $; ->
-            NowBytes = binary:split(list_to_binary([Rest, Bytes]), <<">">>, [global]),
-            {OtherBytes, [LastBytes]} = lists:split(length(NowBytes)-1, NowBytes),
-            NowData = handle_recv_wait(OtherBytes),
-            NState = handle_recv_msg(LastBytes, State#state{data = Data ++ NowData}),
-            NState#state{rest = <<>>, data = []};
-        $> ->
-            NowBytes = binary:split(list_to_binary([Rest, Bytes]), <<">">>, [global]),
-            NowData = handle_recv_wait(NowBytes),
-            State#state{rest = <<>>, data = Data ++ NowData};
-        _ ->
-            State#state{rest = list_to_binary([Rest, Bytes]), data = Data}
-       end,
-    {noreply, NewState};
+    {noreply, check_bytes(Bytes, State)};
 
 handle_info({tcp_closed, Socket}, #state{server = Server} = State) ->
     ?ERROR("tcp close: ~p, ~p", [Socket, State]),
@@ -319,6 +305,22 @@ check_tl1_table(Reqid, ConnNum, #state{tl1_table = Tl1Table} = State) ->
      ConnNum.
 
 
+
+check_bytes(Bytes, #state{rest = Rest} = State) ->
+    NowBytes = binary:split(list_to_binary([Rest, Bytes]), <<";">>, [global]),
+    {OtherBytes, [LastBytes]} = lists:split(length(NowBytes)-1, NowBytes),
+    NewState = check_byte(OtherBytes, State),
+    NewState#state{rest = LastBytes}.
+
+check_byte(Data, State) when is_list(Data)->
+    lists:foldl(fun(Byte, NewState) ->
+        check_byte(Byte, NewState)
+    end, State, Data);
+check_byte(Byte, State) ->    
+    NowByte = binary:split(Byte, <<">">>, [global]),
+    {OtherByte, [LastByte]} = lists:split(length(NowByte)-1, NowByte),
+    handle_recv_msg(LastByte, handle_recv_wait(OtherByte), State);
+
 %% send
 handle_send_tcp(Pct, #state{server = Server, conn_num = ConnNum, socket = Sock}) ->
     case tcp_send(Server, Sock, Pct) of
@@ -354,6 +356,7 @@ tcp_send(Server, Sock, Pct) ->
 send_failed(Server, Pct, ERROR) ->
     Server ! {tl1_error, Pct, ERROR}.
 
+
 %% receive
 handle_recv_wait(Bytes) ->
     handle_recv_wait(Bytes, []).
@@ -367,22 +370,21 @@ handle_recv_wait(<<>>, Data) ->
     Data;
 handle_recv_wait(Bytes, Data) when is_binary(Bytes)->
     case (catch etl1_mpd:process_msg(Bytes)) of
-	{ok, #pct{data = NewData} = _Pct}  ->
-        case NewData of
-            {ok, Data0} ->
-                Data ++ Data0;
-            {error, _Reason} ->
-                Data
-        end ;
-	Error ->
-	    ?ERROR("processing of received message failed: ~n ~p", [Error]),
-	    Data
+        {ok, #pct{data = NewData} = _Pct}  ->
+            case NewData of
+                {ok, Data0} ->
+                    Data ++ Data0;
+                {error, _Reason} ->
+                    Data
+            end ;
+        Error ->
+            ?ERROR("processing of received message failed: ~n ~p", [Error]),
+            Data
     end.
 
-handle_recv_msg(<<>>, State)  ->
+handle_recv_msg(<<>>, _Data, State)  ->
     State;
-handle_recv_msg(Bytes, #state{server = Server, data = Data, socket = Socket, 
-    username = Username, password = Password} = State) ->
+handle_recv_msg(Bytes, Data, #state{server = Server, socket = Socket, username = Username, password = Password} = State) ->
     case (catch etl1_mpd:process_msg(Bytes)) of
         {ok, #pct{complete_code = "DENY", en = "AAFD"}} ->
             ?WARNING("begin to relogin...~p", [State]),
@@ -417,7 +419,7 @@ handle_recv_msg(Bytes, #state{server = Server, data = Data, socket = Socket,
     end.
 
 get_next_id(Id) ->
-    if Id == 1000 * 1000 ->
+    if Id == 1000 * 1000 * 1000 ->
            0;
          true ->
             Id + 1
