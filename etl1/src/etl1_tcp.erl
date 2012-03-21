@@ -221,8 +221,8 @@ handle_info({tcp_closed, Socket}, #state{server = Server} = State) ->
     {noreply, State#state{socket = null, conn_state = disconnect}};
 
 
-handle_info(shakehand, #state{socket = Socket, conn_state = connected} = State) ->
-    tcp_send(Socket, "SHAKEHAND:::shakehand::;"),
+handle_info(shakehand, #state{conn_state = connected} = State) ->
+    send_tcp(self(), "SHAKEHAND:::shakehand::;"),
     erlang:send_after(5 * 60 * 1000, self(), shakehand),
     {noreply, State};
 
