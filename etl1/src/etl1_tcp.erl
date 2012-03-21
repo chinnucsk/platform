@@ -117,7 +117,6 @@ connect(Host, Port, Username, Password) ->
         {ok, Socket, connected};
     {error, Reason} ->
         ?WARNING("tcp connect failure: ~p", [Reason]),
-%        retry_connect(),
         {ok, null, disconnect}
     end.
 
@@ -218,6 +217,7 @@ handle_info({tcp, Sock, Bytes}, #state{socket = Sock} = State) ->
 handle_info({tcp_closed, Socket}, #state{server = Server} = State) ->
     ?ERROR("tcp close: ~p, ~p", [Socket, State]),
     Server ! {tl1_tcp_closed, self()},
+%    erlang:send_after(30000, self(), {timeout, retry_connect}).
     {noreply, State#state{socket = null, conn_state = disconnect}};
 
 
@@ -271,9 +271,6 @@ code_change(_Vsn, State, _Extra) ->
 %%%-------------------------------------------------------------------
 %%% Internal functions
 %%%-------------------------------------------------------------------
-retry_connect() ->
-    erlang:send_after(30000, self(), {timeout, retry_connect}).
-
 clean_tl1_table(#state{tl1_table = Tl1Table} = State) ->
     ?WARNING("begin to clean tl1table:~p", [{ets:info(Tl1Table, size), ets:first(Tl1Table)}]),
     clean_tl1_table(ets:first(Tl1Table), State).
