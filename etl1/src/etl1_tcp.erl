@@ -390,7 +390,7 @@ handle_recv_msg(<<>>, _Data, State)  ->
 handle_recv_msg(Bytes, Data, #state{server = Server, socket = Socket, username = Username, password = Password} = State) ->
     case (catch etl1_mpd:process_msg(Bytes)) of
         {ok, #pct{request_id = "shakehand", complete_code = _CompletionCode}} ->
-            State;
+            State#state{conn_num = check_tl1_table(State)};
         {ok, #pct{request_id = "login", complete_code = CompletionCode}} ->
             ?WARNING("login res: ~p", [CompletionCode]),
             case CompletionCode of
