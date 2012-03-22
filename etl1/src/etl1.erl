@@ -374,11 +374,11 @@ handle_recv_tcp(#pct{request_id = ReqId, type = 'output', complete_code = CompCo
         case ets:lookup(tl1_request_timeout, to_integer(ReqId)) of
             [#request{data = Cmd, time = Time}] ->
                 Now = extbif:timestamp(),
-                ?ERROR("cannot find reqid:~p, time:~p, cmd:~p", [ReqId, Now - Time, Cmd]),
+                ?ERROR("cannot find reqid:~p, time:~p, cmd:~p, ~n data:~p", [ReqId, Now - Time, Cmd, Data]),
                 ets:delete(tl1_request_timeout, to_integer(ReqId)),
                 State#state{req_timeout_over = ReqTimeoutOver + 1};
              _ ->
-                ?ERROR("cannot find reqid2:~p", [ReqId]),
+                ?ERROR("cannot find reqid2:~p, data: ~p", [ReqId, Data]),
                 State
         end
 	end;

@@ -166,7 +166,7 @@ handle_call(Req, _From, State) ->
 %%          {stop, Reason, State}            (terminate/2 is called)
 %%--------------------------------------------------------------------
 handle_cast({login_state, LoginState}, State) ->
-    ?WARNING("login state ...~p, ~p", [LoginState, self()]),
+    ?WARNING("login state ...~p, ~p", [LoginState, State]),
     case LoginState of
         succ -> clean_tl1_table(State);
         fail -> ok
@@ -392,12 +392,14 @@ handle_recv_msg(Bytes, Data, #state{server = Server, socket = Socket, username =
         {ok, #pct{request_id = "shakehand", complete_code = _CompletionCode}} ->
             State;
         {ok, #pct{request_id = "login", complete_code = CompletionCode}} ->
+            ?WARNING("login res: ~p", [CompletionCode]),
             case CompletionCode of
                 "COMPLD" -> login_state(self(), succ);
                 "DENY" -> login_again(Socket, Username, Password)
             end,
             State;
         {ok, #pct{request_id = "login_again", complete_code = CompletionCode}} ->
+            ?WARNING("login_again res: ~p", [CompletionCode]),
             LoginState = case CompletionCode of
                 "COMPLD" -> succ;
                 "DENY" -> fail
