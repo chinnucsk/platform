@@ -27,9 +27,9 @@ process_msg(Lines) ->
     RespondId = lists:nth(2, Lines),
     {ReqLevel, ReqId, CompletionCode} = get_response_id(RespondId),
     RespondBlock = lists:nthtail(2, Lines),
-    process_msg({CompletionCode, ReqId, ReqLevel}, RespondBlock).
+    process_msg({CompletionCode, ReqId, ReqLevel}, RespondBlock, Lines).
 
- process_msg({"ALARM", ReqId, TrapLevel}, RespondBlock) ->
+ process_msg({"ALARM", ReqId, TrapLevel}, RespondBlock, _Lines) ->
     TrapData = get_trap_body(TrapLevel, RespondBlock),
     ?INFO("get trap data ~p", [TrapData]),
     Pct = #pct{request_id = ReqId,
@@ -38,8 +38,8 @@ process_msg(Lines) ->
                },
    {ok, Pct};
 
- process_msg({CompletionCode, ReqId, _ReqLevel}, RespondBlock) ->
-    {{En, Endesc}, Rest} = get_response_status(RespondBlock),
+ process_msg({CompletionCode, ReqId, _ReqLevel}, RespondBlock, Lines) ->
+    {{En, Endesc}, Rest} = get_response_status(RespondBlock, Lines),
 %    ?INFO("get en endesc :~p data:~p",[{En,Endesc}, Rest]),
     RespondData = case get_response_body(CompletionCode, Rest) of
         no_data ->
@@ -82,7 +82,8 @@ get_trap_body(TrapLevel, TrapBody) ->
          {ok, [{alarm_level, TrapLevel}|lists:flatten(Rest)]}
     end, Datas).
 
-get_response_status([Status|Data]) ->
+
+get_response_status([Status|Data], _Lines) ->
     {En, Rest} = get_status("EN=", Status),
     case En of
         false ->
@@ -90,7 +91,10 @@ get_response_status([Status|Data]) ->
         _ ->
             {Endesc, _Rest1} = get_status("ENDESC=", Rest),
             {{En, Endesc}, Data}
-     end.       
+     end;
+get_response_status(_, Lines) ->
+    ?WARNING("get unex data :~p", [Lines]),
+    ok.
 
 %DELAY, DENY, PRTL, RTRV
 get_response_body("COMPLD", Data)->
