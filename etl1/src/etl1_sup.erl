@@ -25,4 +25,4 @@ start_link(Opts) ->
 
 
 init([]) ->
-	{ok, {{one_for_all, 10, 100}, []}}.
+	{ok, {{one_for_one, 10, 100}, []}}.

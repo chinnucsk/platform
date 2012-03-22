@@ -410,6 +410,10 @@ handle_recv_msg(Bytes, Data, #state{server = Server, socket = Socket, username =
         {ok, #pct{type = 'alarm', data = {ok, Data2}} = Pct}  ->
             Server ! {tl1_trap, self(), Pct#pct{data = Data ++ Data2}},
             State;
+        {ok, #pct{type = 'output', data = Data, complete_code = "DENY", en = "AAFD"} = Pct}  ->
+            ?WARNING("error authentication, login_again : ~n ~p,", [Pct]),
+            Server ! {tl1_tcp, self(), Pct},
+            State#state{conn_num = check_tl1_table(State)};
         {ok, #pct{type = 'output', data = NewData} = Pct}  ->
             AccData = case NewData of
                 {ok, Data2} ->

@@ -19,4 +19,4 @@ start_child(Sup, Params) ->
 init([]) ->
     {ok, {{simple_one_for_one, 0, 1},
         [{etl1_tcp, {etl1_tcp, start_link, []},
-            transient , brutal_kill, worker, [etl1_tcp]}]}}.
+            transient , 10, worker, [etl1_tcp]}]}}.
