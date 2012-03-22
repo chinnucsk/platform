@@ -208,14 +208,14 @@ eval({'<', Name, Val}, Args) ->
 
 eval({'!=', Name, Val}, Args) ->
     {value, {_, ArgVal}} = keysearch(Name, 1, Args),
-    not (ArgVal == Val);
+    not (string:to_lower(ArgVal) == string:to_lower(Val));
 
 eval({'=', Name, Val}, Args) ->
      case keysearch(Name, 1, Args) of
      {value, {_, ArgVal}} -> 
 		if
 		Val == "*" -> true;
-		true -> ArgVal == Val
+		true -> string:to_lower(ArgVal) == string:to_lower(Val)
 		end;
      false -> 
 		false
