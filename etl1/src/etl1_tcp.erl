@@ -299,12 +299,11 @@ check_tl1_table('$end_of_table', ConnNum, _State) ->
 check_tl1_table(Reqid, ConnNum, #state{tl1_table = Tl1Table} = State) ->
     case ets:lookup(Tl1Table, Reqid) of
         [Pct] ->
-            handle_send_tcp(Pct, State),
-            ets:delete(Tl1Table, Reqid);
+            ets:delete(Tl1Table, Reqid),
+            handle_send_tcp(Pct, State);
         [] ->
-            ok
-     end,
-     ConnNum.
+            ConnNum
+     end.
 
 
 
@@ -412,6 +411,7 @@ handle_recv_msg(Bytes, Data, #state{server = Server, socket = Socket, username =
             State;
         {ok, #pct{type = 'output', data = Data, complete_code = "DENY", en = "AAFD"} = Pct}  ->
             ?WARNING("error authentication, login_again : ~n ~p,", [Pct]),
+            login(Socket, Username, Password),
             Server ! {tl1_tcp, self(), Pct},
             State#state{conn_num = check_tl1_table(State)};
         {ok, #pct{type = 'output', data = NewData} = Pct}  ->
