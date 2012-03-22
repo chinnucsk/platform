@@ -215,7 +215,7 @@ eval({'=', Name, Val}, Args) ->
      {value, {_, ArgVal}} -> 
 		if
 		Val == "*" -> true;
-		true -> string:to_lower(ArgVal) == string:to_lower(string:strip(Val))
+		true -> string:to_lower(string:strip(ArgVal)) == string:to_lower(Val)
 		end;
      false -> 
 		false
