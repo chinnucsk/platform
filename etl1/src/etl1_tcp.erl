@@ -31,7 +31,7 @@
 -define(MAX_CONN, 100).
 
 -record(state, {server, host, port, username, password, max_conn,
-        socket, count, tl1_table, conn_num, conn_state, login_state, rest}).
+        socket, count, tl1_table, conn_num, conn_state, login_state, rest, dict}).
 
 -record(pct, {id, request_id, type, complete_code, en, data}).
 
@@ -211,7 +211,7 @@ handle_cast(Msg, State) ->
 %%          {stop, Reason, State}            (terminate/2 is called)
 %%--------------------------------------------------------------------
 handle_info({tcp, Sock, Bytes}, #state{socket = Sock} = State) ->
-%    ?INFO("received tcp ~p ", [Bytes]),
+    ?INFO("received tcp ~p ", [Bytes]),
     {noreply, check_bytes(Bytes, State)};
 
 handle_info({tcp_closed, Socket}, #state{server = Server} = State) ->
@@ -309,7 +309,7 @@ check_tl1_table(Reqid, ConnNum, #state{tl1_table = Tl1Table} = State) ->
 
 check_bytes(Bytes, #state{rest = Rest} = State) ->
     NowBytes = binary:split(list_to_binary([Rest, Bytes]), <<";">>, [global]),
-    ?INFO("get bytes:~p", [NowBytes]),
+%    ?INFO("get bytes:~p", [NowBytes]),
     {OtherBytes, [LastBytes]} = lists:split(length(NowBytes)-1, NowBytes),
     NewState = check_byte(OtherBytes, State),
     NewState#state{rest = LastBytes}.
@@ -321,7 +321,7 @@ check_byte(Data, State) when is_list(Data)->
 check_byte(Byte, State) ->    
     NowByte = binary:split(Byte, <<">">>, [global]),
     {OtherByte, [LastByte]} = lists:split(length(NowByte)-1, NowByte),
-    handle_recv_msg(LastByte, handle_recv_wait(OtherByte), State).
+    handle_recv_msg(LastByte, handle_recv_wait(OtherByte, State)).
 
 %% send
 handle_send_tcp(Pct, #state{server = Server, conn_num = ConnNum, socket = Sock}) ->
@@ -360,33 +360,30 @@ send_failed(Server, Pct, ERROR) ->
 
 
 %% receive
-handle_recv_wait(Bytes) ->
-    handle_recv_wait(Bytes, []).
-
-handle_recv_wait([], Data) ->
-    Data;
-handle_recv_wait([A|Bytes], Data) when is_list(Bytes)->
-    handle_recv_wait(Bytes, Data ++ handle_recv_wait(A, []));
-
-handle_recv_wait(<<>>, Data) ->
-    Data;
-handle_recv_wait(Bytes, Data) when is_binary(Bytes)->
+handle_recv_wait([], State) ->
+    State;
+handle_recv_wait([A|Bytes], State) ->
+    handle_recv_wait(Bytes, handle_recv_wait(A, State));
+handle_recv_wait(<<>>, State) ->
+    State;
+handle_recv_wait(Bytes, #state{dict = Dict} = State) when is_binary(Bytes)->
     case (catch etl1_mpd:process_msg(Bytes)) of
-        {ok, #pct{data = NewData} = _Pct}  ->
+        {ok, #pct{request_id = ReqId, data = NewData} = _Pct}  ->
             case NewData of
-                {ok, Data0} ->
-                    Data ++ Data0;
+                {ok, Data} ->
+                    State#state{dict = dict:append_list(ReqId, Data, Dict)};
                 {error, _Reason} ->
-                    Data
-            end ;
+                    State
+            end;
         Error ->
             ?ERROR("processing of received message failed: ~n ~p", [Error]),
-            Data
+            State
     end.
 
-handle_recv_msg(<<>>, _Data, State)  ->
+handle_recv_msg(<<>>, State)  ->
     State;
-handle_recv_msg(Bytes, Data, #state{server = Server, socket = Socket, username = Username, password = Password} = State) ->
+handle_recv_msg(Bytes, #state{server = Server, socket = Socket, username = Username, password = Password,
+    dict = Dict} = State) ->
     case (catch etl1_mpd:process_msg(Bytes)) of
         {ok, #pct{request_id = "shakehand", complete_code = _CompletionCode}} ->
             State#state{conn_num = check_tl1_table(State)};
@@ -406,23 +403,28 @@ handle_recv_msg(Bytes, Data, #state{server = Server, socket = Socket, username =
             login_state(self(), LoginState),
             State;
             
-        {ok, #pct{type = 'alarm', data = {ok, Data2}} = Pct}  ->
-            Server ! {tl1_trap, self(), Pct#pct{data = Data ++ Data2}},
+        {ok, #pct{type = 'alarm', data = {ok, Data}} = Pct}  ->
+            Server ! {tl1_trap, self(), Pct#pct{data = Data}},
             State;
-        {ok, #pct{type = 'output', data = Data, complete_code = "DENY", en = "AAFD"} = Pct}  ->
+        {ok, #pct{type = 'output',complete_code = "DENY", en = "AAFD"} = Pct}  ->
             ?WARNING("error authentication, login_again : ~n ~p,", [Pct]),
             login(Socket, Username, Password),
             Server ! {tl1_tcp, self(), Pct},
             State#state{conn_num = check_tl1_table(State)};
-        {ok, #pct{type = 'output', data = NewData} = Pct}  ->
+        {ok, #pct{type = 'output', request_id = ReqId, data = NewData} = Pct}  ->
             AccData = case NewData of
-                {ok, Data2} ->
-                    {ok, Data ++ Data2};
+                {ok, Data} ->
+                    case dict:find(ReqId, Dict) of
+                        {ok, Data0} ->
+                            {ok, Data0 ++ Data};
+                        error ->
+                            {ok, Data}
+                    end;
                 {error, _Reason} ->
                     {error, _Reason}
             end,
             Server ! {tl1_tcp, self(), Pct#pct{data = AccData}},
-            State#state{conn_num = check_tl1_table(State)};
+            State#state{conn_num = check_tl1_table(State), dict = dict:erase(ReqId, Dict)};
         Error ->
             ?ERROR("processing of received message failed: ~n ~p", [Error]),
             State

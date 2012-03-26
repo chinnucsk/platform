@@ -140,7 +140,7 @@ do_connect(TcpSup, Tl1Info) ->
     case  do_connect2(TcpSup, Tl1Info) of
         {ok, Pid} ->
             etl1_tcp:shakehand(Pid),
-            {{to_list(Type), to_list(CityId)}, Pid};
+            [{{to_list(Type), to_list(CityId)}, Pid}];
         {error, Error} ->
             ?ERROR("get tcp error: ~p, ~p", [Error, Tl1Info]),
             []
@@ -182,7 +182,7 @@ handle_call(get_tl1_req, _From,  #state{req_id=Id, req_over=ReqOver, req_timeout
 
 handle_call({set_tl1, Tl1Info}, _From, #state{tl1_tcp = Pids, tl1_tcp_sup = TcpSup} = State) ->
     NewPid = do_connect(TcpSup, Tl1Info),
-    NewState = State#state{tl1_tcp = [NewPid|Pids]},
+    NewState = State#state{tl1_tcp = NewPid ++ Pids},
     {reply, ok, NewState};
 
 handle_call({sync_input, Send, Type, Cmd, Timeout}, From, #state{tl1_tcp = Pids} = State) ->

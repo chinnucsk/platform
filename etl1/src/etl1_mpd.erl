@@ -94,7 +94,7 @@ get_response_status([Status|Data], _Lines) ->
      end;
 get_response_status(_, Lines) ->
     ?WARNING("get unex data :~p", [Lines]),
-    ok.
+    {{null, null}, []}.
 
 %DELAY, DENY, PRTL, RTRV
 get_response_body("COMPLD", Data)->
