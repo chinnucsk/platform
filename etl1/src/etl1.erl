@@ -238,8 +238,8 @@ handle_info({sync_timeout, ReqId, From}, State) ->
             gen_server:reply(From, {error, {tl1_timeout, [ReqId, Data]}}),
             ets:insert(tl1_request_timeout, Req),
             ets:delete(tl1_request_table, ReqId);
-        _ ->
-            ?ERROR("cannot lookup reqid:~p", [ReqId])
+        V ->
+            ?ERROR("cannot lookup reqid:~p, v:~p", [ReqId, V])
     end,
     {noreply, State};
 
@@ -329,7 +329,8 @@ send_req(Pid, Req, Cmd, State) ->
 %% send error
 handle_tl1_error(#pct{request_id = ReqId} = Pct, Reason, #state{callback = Callback} = _State) ->
     case ets:lookup(tl1_request_table, to_integer(ReqId)) of
-        [#request{type = 'input', ref = _Ref, from = From}] ->
+        [#request{type = 'input', ref = Ref, from = From}] ->
+            catch cancel_timer(Ref),
             gen_server:reply(From, {error, Reason}),
             ets:delete(tl1_request_table, ReqId),
             ok;

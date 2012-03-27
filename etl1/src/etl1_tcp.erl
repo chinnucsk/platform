@@ -105,7 +105,7 @@ do_init(Server, Args) ->
     {ok, Socket, ConnState} = connect(Host, Port, Username, Password),
     %%-- We are done ---
     {ok, #state{server = Server, host = Host, port = Port, username = Username, password = Password, max_conn = MaxConn, 
-        socket = Socket, count = 0, tl1_table = Tl1Table, conn_num = 0, conn_state = ConnState, rest = <<>>}}.
+        socket = Socket, count = 0, tl1_table = Tl1Table, conn_num = 0, conn_state = ConnState, rest = <<>>, dict = dict:new()}}.
 
 connect(Host, Port, Username, Password) when is_binary(Host) ->
     connect(binary_to_list(Host), Port, Username, Password);
@@ -340,10 +340,10 @@ tcp_send(Sock, Cmd) ->
         fail
     end.
 
-tcp_send(Server, Sock, Pct) ->
-    case (catch gen_tcp:send(Sock, Pct#pct.data)) of
+tcp_send(Server, Sock, #pct{data = Data} = Pct) ->
+    case (catch gen_tcp:send(Sock, Data)) of
 	ok ->
-	    ?INFO("send cmd  to :~p", [Pct#pct.data]),
+	    ?INFO("send cmd  to :~p", [Data]),
 	    succ;
 	{error, Reason} ->
 	    ?ERROR("failed sending message to ~p",[Reason]),
@@ -424,6 +424,7 @@ handle_recv_msg(Bytes, #state{server = Server, socket = Socket, username = Usern
                     {error, _Reason}
             end,
             Server ! {tl1_tcp, self(), Pct#pct{data = AccData}},
+            ?INFO("send tl1_tcp reqid:~p", [ReqId]),
             State#state{conn_num = check_tl1_table(State), dict = dict:erase(ReqId, Dict)};
         Error ->
             ?ERROR("processing of received message failed: ~n ~p", [Error]),
