@@ -299,11 +299,12 @@ check_tl1_table('$end_of_table', ConnNum, _State) ->
 check_tl1_table(Reqid, ConnNum, #state{tl1_table = Tl1Table} = State) ->
     case ets:lookup(Tl1Table, Reqid) of
         [Pct] ->
-            ets:delete(Tl1Table, Reqid),
-            handle_send_tcp(Pct, State);
+            handle_send_tcp(Pct, State),
+            ets:delete(Tl1Table, Reqid);
         [] ->
-            ConnNum
-     end.
+            ok
+     end,
+     ConnNum.
 
 
 

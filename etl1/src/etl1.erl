@@ -295,8 +295,8 @@ handle_sync_input(Pid, Cmd, Timeout, From, #state{req_id = ReqId} = State) ->
               time    = extbif:timestamp(),
               timeout = Timeout,
               from    = From},
-    send_req(Pid, Req, Cmd, State),
     ets:insert(tl1_request_table, Req),
+    send_req(Pid, Req, Cmd, State),
     {ok, State#state{req_id = NextReqId}}.
 
 handle_asyn_input(Pid, Cmd, Ems, #state{req_id = ReqId} = State) ->
@@ -307,8 +307,8 @@ handle_asyn_input(Pid, Cmd, Ems, #state{req_id = ReqId} = State) ->
               ems     = Ems,
               data    = Cmd,
               time    = extbif:timestamp()},
-    send_req(Pid, Req, Cmd, State),
     ets:insert(tl1_request_table, Req),
+    send_req(Pid, Req, Cmd, State),
     {noreply, State#state{req_id = NextReqId}}.
 
 
@@ -321,9 +321,9 @@ send_req(Pid, Req, Cmd, State) ->
             handle_tl1_error(Pct, Reason, State)
          catch
             Error:Exception ->
-            ?ERROR("exception: ~p, ~n ~p", [{Error, Exception}, erlang:get_stacktrace()]),
-            Pct = #pct{request_id = Req#request.id},
-            handle_tl1_error(Pct, {'EXIT',Exception}, State)
+                ?ERROR("exception: ~p, ~n ~p", [{Error, Exception}, erlang:get_stacktrace()]),
+                Pct = #pct{request_id = Req#request.id},
+                handle_tl1_error(Pct, {'EXIT',Exception}, State)
     end.
 
 %% send error
@@ -341,7 +341,7 @@ handle_tl1_error(#pct{request_id = ReqId} = Pct, Reason, #state{callback = Callb
                 Pid ! {asyn_data, {error, Reason}}
             end, Callback);
         _ ->
-            ?ERROR("unexpected tl1, reqid:~p, ~n error: ~p",[Pct, Reason])
+            ?ERROR("unexpected tl1, reqid:~p, ~p,~n error: ~p",[ReqId, Pct, Reason])
     end;
 handle_tl1_error(Tcp, Reason, _State) ->
     ?ERROR("tl1 error: ~p, ~p",[Tcp, Reason]).
