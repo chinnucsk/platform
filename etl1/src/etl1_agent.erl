@@ -23,6 +23,8 @@ init([BrokerOpt]) ->
     {ok, Broker} = connect(BrokerOpt),
     {ok, #state{broker = Broker, broker_opts = BrokerOpt}}.
 
+connect([]) ->
+    {ok, null};
 connect(Opts) ->
     Succ = fun(Pid) ->
         amqp:queue(Pid, <<"tl1.agent">>),
