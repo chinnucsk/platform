@@ -208,7 +208,7 @@ eval({'<', Name, Val}, Args) ->
 
 eval({'!=', Name, Val}, Args) ->
     {value, {_, ArgVal}} = keysearch(Name, 1, Args),
-    not (string:to_lower(ArgVal) == string:to_lower(Val));
+    not (string:to_lower(string:strip(ArgVal)) == string:to_lower(Val));
 
 eval({'=', Name, Val}, Args) ->
      case keysearch(Name, 1, Args) of
